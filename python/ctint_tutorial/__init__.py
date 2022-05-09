@@ -26,5 +26,6 @@ DOC
 
 """
 from .ctint_tutorial_module import Solver
+from .ctint_tutorial_module import Solver2
 
-__all__ = ['Solver']
+__all__ = ['Solver','Solver2']

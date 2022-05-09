@@ -1,4 +1,4 @@
-#include "solver.hpp"
+#include "ctint.hpp"
 
 #include <triqs/mc_tools.hpp>
 #include <triqs/det_manip.hpp>
@@ -150,7 +150,9 @@ solver::solver(double beta_, int n_iw, int n_tau)
      g0tilde_iw{g0_iw},
      g_iw{g0_iw},
      M_iw{g0_iw},
-     g0tilde_tau{make_block_gf({"up", "down"}, gf<imtime>{{beta, Fermion, n_tau}, {1, 1}})} {}
+     g0tilde_tau{make_block_gf({"up", "down"}, gf<imtime>{{beta, Fermion, n_tau}, {1, 1}})} {
+       std::cout << "--------- /!\\ Using Solver /!\\ ---------\n";
+     }
 
 // The method that runs the qmc
 void solver::solve(double U, double delta, int n_cycles, int length_cycle, int n_warmup_cycles, std::string random_name, int max_time) {
