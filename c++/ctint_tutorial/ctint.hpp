@@ -13,6 +13,7 @@ namespace ctint_tutorial {
     double beta;
     triqs::gfs::block_gf<imfreq> g0_iw, g0tilde_iw, g_iw, M_iw;
     triqs::gfs::block_gf<imtime> g0tilde_tau;
+    std::vector<double> hist;
 
     public:
     /// Access non-interacting Matsubara Green function
@@ -23,6 +24,9 @@ namespace ctint_tutorial {
 
     /// Access interacting Matsubara Green function
     block_gf_view<imfreq> G_iw() { return g_iw; }
+
+    /// Access order histogram
+    std::vector<double> Hist() { return hist; };
 
     /// Construct a ctint solver
     solver(double beta_, int n_iw = 1024, int n_tau = 100001);
@@ -37,6 +41,7 @@ namespace ctint_tutorial {
     double beta;
     triqs::gfs::block_gf<imfreq> g0_iw, g0tilde_iw, g_iw, M_iw; //M_iw is the interacting Green's function kernel
     triqs::gfs::block_gf<imtime> g0tilde_tau;
+    std::vector<double> hist;
 
     public:
     /// Access non-interacting Matsubara Green function
@@ -48,6 +53,9 @@ namespace ctint_tutorial {
     /// Access interacting Matsubara Green function
     block_gf_view<imfreq> G_iw() { return g_iw; }
 
+    /// Access order histogram
+    std::vector<double> Hist() { return hist; };
+    
     /// Construct a ctint solver
     solver2(double beta_, int n_iw = 1024, int n_tau = 100001);
 

@@ -46,33 +46,41 @@ c.add_property(name = "G_iw",
                getter = cfunction("block_gf_view<triqs::gfs::imfreq> G_iw ()"),
                doc = r"""Access interacting Matsubara Green function""")
 
+c.add_property(name = "Hist",
+               getter = cfunction("std::vector<double> Hist ()"),
+               doc = r"""Access order histogram""")
+
 module.add_class(c)
 
 # The class solver2
-c = class_(
+c2 = class_(
         py_type = "Solver2",  # name of the python class
         c_type = "ctint_tutorial::solver2",   # name of the C++ class
         doc = r"""""",   # doc of the C++ class
         hdf5 = False,
 )
 
-c.add_constructor("""(double beta_, int n_iw = 1024, int n_tau = 100001)""", doc = r"""Construct a ctint solver""")
+c2.add_constructor("""(double beta_, int n_iw = 1024, int n_tau = 100001)""", doc = r"""Construct a ctint solver""")
 
-c.add_method("""void solve (double U, double delta, int n_cycles, int length_cycle = 50, int n_warmup_cycles = 5000, std::string random_name = \"\", int max_time = -1)""",
+c2.add_method("""void solve (double U, double delta, int n_cycles, int length_cycle = 50, int n_warmup_cycles = 5000, std::string random_name = \"\", int max_time = -1)""",
              doc = r"""Method that performs the QMC calculation""")
 
-c.add_property(name = "G0_iw",
+c2.add_property(name = "G0_iw",
                getter = cfunction("block_gf_view<triqs::gfs::imfreq> G0_iw ()"),
                doc = r"""Access non-interacting Matsubara Green function""")
 
-c.add_property(name = "G0_tau",
+c2.add_property(name = "G0_tau",
                getter = cfunction("block_gf_view<triqs::gfs::imtime> G0_tau ()"),
                doc = r"""Access non-interacting imaginary-time Green function""")
 
-c.add_property(name = "G_iw",
+c2.add_property(name = "G_iw",
                getter = cfunction("block_gf_view<triqs::gfs::imfreq> G_iw ()"),
                doc = r"""Access interacting Matsubara Green function""")
 
-module.add_class(c)
+c2.add_property(name = "Hist",
+               getter = cfunction("std::vector<double> Hist ()"),
+               doc = r"""Access order histogram""")
+
+module.add_class(c2)
 
 module.generate_code()

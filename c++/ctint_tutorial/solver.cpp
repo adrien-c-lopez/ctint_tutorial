@@ -142,6 +142,48 @@ struct measure_M {
   }
 };
 
+struct measure_histogram {
+
+  // The Monte-Carlo configuration
+  configuration const *config; // Pointer to the MC configuration
+
+  // Reference to accumulation vector
+  std::vector<double> &histogram;
+
+  // Accumulation counter
+  long N = 0;
+
+  measure_histogram(configuration const *config_, std::vector<double> &histogram_)
+      : config(config_), histogram(histogram_) {}
+
+  /// Accumulate perturbation order into histogram
+  void accumulate(dcomplex sign) {
+    //std::cout << "accumulating  ";
+    int k = config->perturbation_order();
+    while (k >= histogram.size()) histogram.resize(2 * histogram.size());
+    histogram[k] += 1.;
+    N += 1;
+    //std::cout << "->  accumulated k:" << k << '\n';
+  }
+
+  /// Reduce and normalize
+  void collect_results(mpi::communicator const &comm) {
+    std::cout << "collecting  ";
+    N = mpi::all_reduce(N, comm);
+  
+    // Make sure that all mpi threads have an equally sized histogram
+    auto max_k_vec         = std::vector<size_t>(comm.size());
+    max_k_vec[comm.rank()] = histogram.size();
+    max_k_vec              = mpi::all_reduce(max_k_vec, comm);
+    histogram.resize(*std::max_element(max_k_vec.begin(), max_k_vec.end()));
+
+    // Reduce histogram over all mpi threads
+    histogram = mpi::all_reduce(histogram, comm);
+    for (auto &h_k : histogram) h_k = h_k / N;
+    std::cout << "->  collected N:" << N << '\n';
+  }
+};
+
 // ------------ The main class of the solver ------------------------
 
 solver::solver(double beta_, int n_iw, int n_tau)
@@ -150,7 +192,8 @@ solver::solver(double beta_, int n_iw, int n_tau)
      g0tilde_iw{g0_iw},
      g_iw{g0_iw},
      M_iw{g0_iw},
-     g0tilde_tau{make_block_gf({"up", "down"}, gf<imtime>{{beta, Fermion, n_tau}, {1, 1}})} {
+     g0tilde_tau{make_block_gf({"up", "down"}, gf<imtime>{{beta, Fermion, n_tau}, {1, 1}})},
+     hist{std::vector<double>(3)} {
        std::cout << "--------- /!\\ Using Solver /!\\ ---------\n";
      }
 
@@ -181,6 +224,7 @@ void solver::solve(double U, double delta, int n_cycles, int length_cycle, int n
   CTQMC.add_move(move_insert{&config, CTQMC.get_rng(), beta, U}, "insertion");
   CTQMC.add_move(move_remove{&config, CTQMC.get_rng(), beta, U}, "removal");
   CTQMC.add_measure(measure_M{&config, M_iw, beta}, "M measurement");
+  CTQMC.add_measure(measure_histogram{&config, hist}, "histogram measurement");
 
   // Run and collect results
   CTQMC.warmup_and_accumulate(n_warmup_cycles, n_cycles, length_cycle, triqs::utility::clock_callback(max_time));

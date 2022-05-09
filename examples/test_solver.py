@@ -9,7 +9,7 @@ from ctint_tutorial import Solver, Solver2
 U = 2.5            # Hubbard interaction
 mu = U/2.0         # Chemical potential
 half_bandwidth=1.0 # Half bandwidth (energy unit)
-beta = 100.0        # Inverse temperature
+beta = 40.         # Inverse temperature
 n_iw = 128         # Number of Matsubara frequencies
 n_cycles = 10000   # Number of MC cycles
 delta = 0.1        # delta parameter
@@ -31,6 +31,7 @@ with HDFArchive("data/test_solver.h5",'w') as A:
 
   if mpi.is_master_node():
    A['G'] = G_sym # Save G from every iteration to file
+   A['hist'] = S.Hist
 
 S = Solver2(beta, n_iw) # Initialize the solver
 
@@ -48,3 +49,4 @@ with HDFArchive("data/test_solver2.h5",'w') as A:
 
   if mpi.is_master_node():
    A['G'] = G_sym # Save G from every iteration to file
+   A['hist'] = S.Hist
