@@ -50,6 +50,10 @@ c.add_property(name = "Hist",
                getter = cfunction("std::vector<double> Hist ()"),
                doc = r"""Access order histogram""")
 
+c.add_property(name = "Hist_sign",
+                getter = cfunction("std::vector<dcomplex> Hist_sign ()"),
+                doc = r"""Access order sign histogram""")
+
 module.add_class(c)
 
 # The class solver2
@@ -62,7 +66,7 @@ c2 = class_(
 
 c2.add_constructor("""(double beta_, int n_iw = 1024, int n_tau = 100001)""", doc = r"""Construct a ctint solver""")
 
-c2.add_method("""void solve (double U, double delta, int n_cycles, int length_cycle = 50, int n_warmup_cycles = 5000, std::string random_name = \"\", int max_time = -1)""",
+c2.add_method("""void solve (double U, double delta, int n_cycles, int length_cycle = 50, int n_warmup_cycles = 5000, std::string random_name = \"\", int max_time = -1, int seed = 34788)""",
              doc = r"""Method that performs the QMC calculation""")
 
 c2.add_property(name = "G0_iw",
@@ -80,6 +84,10 @@ c2.add_property(name = "G_iw",
 c2.add_property(name = "Hist",
                getter = cfunction("std::vector<double> Hist ()"),
                doc = r"""Access order histogram""")
+
+c2.add_property(name = "Hist_sign",
+               getter = cfunction("std::vector<dcomplex> Hist_sign ()"),
+               doc = r"""Access order sign histogram""")
 
 module.add_class(c2)
 

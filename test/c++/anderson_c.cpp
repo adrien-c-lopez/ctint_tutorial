@@ -1,4 +1,4 @@
-#include <ctint_tutorial/solver.hpp>
+#include <ctint_tutorial/ctint.hpp>
 
 #include <triqs/gfs.hpp>
 #include <triqs/test_tools/gfs.hpp>
