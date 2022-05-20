@@ -6,12 +6,6 @@ using namespace ctint_tutorial;
 
 // --------------- The QMC configuration ----------------
 
-// Argument type of g0bar
-struct arg_t {
-  double tau; // The imaginary time
-  int s;      // The auxiliary spin
-};
-
 // The function that appears in the calculation of the determinant
 struct g0bar_tau {
   gf<imtime> const &gt;
@@ -33,13 +27,13 @@ struct g0bar_tau {
 // The Monte Carlo configuration
 struct configuration {
   // M-matrices for up and down
-  std::vector<triqs::det_manip::det_manip<g0bar_tau>> Mmatrices;
+  std::vector<triqs::det_manip::det_manip<g0bar_tau0>> Mmatrices;
 
   int perturbation_order() const { return Mmatrices[up].size(); }
 
   configuration(block_gf<imtime> &g0tilde_tau, double beta, double delta) {
     // Initialize the M-matrices. 100 is the initial matrix size
-    for (auto spin : {up, down}) Mmatrices.emplace_back(g0bar_tau{g0tilde_tau[spin], beta, delta, spin}, 100);
+    for (auto spin : {up, down}) Mmatrices.emplace_back(g0bar_tau0{g0tilde_tau[spin], beta, delta, spin}, 100);
   }
 };
 
@@ -138,6 +132,38 @@ struct measure_M {
   }
 };
 
+struct measure_d {
+
+  configuration *config; // Pointer to the MC configuration
+  dcomplex &d;        // reference to M-matrix
+  triqs::mc_tools::random_generator &rng;
+  double beta;
+  dcomplex Z = 0;
+
+  measure_d(configuration *config_, dcomplex &d_, triqs::mc_tools::random_generator &rng_, double beta_) : config(config_), d(d_), rng(rng_), beta(beta_) { d = 0; }
+
+  void accumulate(dcomplex sign) {
+    Z += sign;
+    dcomplex B = 1;
+    int k = config->perturbation_order();
+    arg_t t {0,rng(2)};
+
+    for (auto &m : config->Mmatrices) {
+      B *= m.try_insert(k,k,t,t);
+      m.reject_last_try();
+    }
+
+    d += sign*B;
+  }
+
+  void collect_results(mpi::communicator const &c) {
+    d = mpi::all_reduce(d, c);
+    Z  = mpi::all_reduce(Z, c);
+    d = d / Z;
+
+  }
+};
+
 struct measure_histogram {
 
   // The Monte-Carlo configuration
@@ -150,7 +176,7 @@ struct measure_histogram {
   long N = 0;
 
   measure_histogram(configuration const *config_, std::vector<double> &histogram_)
-      : config(config_), histogram(histogram_) {}
+      : config(config_), histogram(histogram_) {histogram = std::vector<double>(2);}
 
   /// Accumulate perturbation order into histogram
   void accumulate(dcomplex sign) {
@@ -187,11 +213,9 @@ struct measure_histogram_sign {
   // Reference to accumulation vector
   std::vector<dcomplex> &histogram_sign;
 
-  // Accumulation counter
-  long N = 0;
 
   measure_histogram_sign(configuration const *config_, std::vector<dcomplex> &histogram_sign_)
-      : config(config_), histogram_sign(histogram_sign_) {}
+      : config(config_), histogram_sign(histogram_sign_) {histogram_sign = std::vector<dcomplex>(2);}
 
   /// Accumulate perturbation order into histogram
   void accumulate(dcomplex sign) {
@@ -199,14 +223,12 @@ struct measure_histogram_sign {
     int k = config->perturbation_order();
     while (k >= histogram_sign.size()) histogram_sign.resize(2 * histogram_sign.size());
     histogram_sign[k] += sign;
-    N += 1;
     //std::cout << "->  accumulated k:" << k << '\n';
   }
 
   /// Reduce and normalize
   void collect_results(mpi::communicator const &comm) {
     std::cout << "collecting  ";
-    N = mpi::all_reduce(N, comm);
   
     // Make sure that all mpi threads have an equally sized histogram
     auto max_k_vec         = std::vector<size_t>(comm.size());
@@ -217,7 +239,7 @@ struct measure_histogram_sign {
     // Reduce histogram over all mpi threads
     histogram_sign = mpi::all_reduce(histogram_sign, comm);
 
-    for (auto &h_k : histogram_sign) h_k = h_k / N;
+    for (auto &h_k : histogram_sign) h_k = h_k / histogram_sign[0];
   }
 };
 // ------------ The main class of the solver ------------------------
@@ -230,12 +252,14 @@ solver::solver(double beta_, int n_iw, int n_tau)
      M_iw{g0_iw},
      g0tilde_tau{make_block_gf({"up", "down"}, gf<imtime>{{beta, Fermion, n_tau}, {1, 1}})},
      hist{std::vector<double>(2)},
-     hist_sign{std::vector<dcomplex>(2)} {
+     hist_sign{std::vector<dcomplex>(2)},
+     //d0{0},
+     d{0} {
        std::cout << "--------- /!\\ Using Solver /!\\ ---------\n";
      }
 
 // The method that runs the qmc
-void solver::solve(double U, double delta, int n_cycles, int length_cycle, int n_warmup_cycles, std::string random_name, int max_time) {
+void solver::solve(double U, double delta, int n_cycles, int length_cycle, int n_warmup_cycles, std::string random_name, int max_time, int seed) {
 
   mpi::communicator world;
   triqs::clef::placeholder<0> spin_;
@@ -249,7 +273,7 @@ void solver::solve(double U, double delta, int n_cycles, int length_cycle, int n
 
   // Rank-specific variables
   int verbosity   = (world.rank() == 0 ? 3 : 0);
-  int random_seed = 34788 + 928374 * world.rank();
+  int random_seed = seed + 928374 * world.rank();
 
   // Construct a Monte Carlo loop
   triqs::mc_tools::mc_generic<dcomplex> CTQMC(random_name, random_seed, verbosity);
@@ -261,6 +285,7 @@ void solver::solve(double U, double delta, int n_cycles, int length_cycle, int n
   CTQMC.add_move(move_insert{&config, CTQMC.get_rng(), beta, U}, "insertion");
   CTQMC.add_move(move_remove{&config, CTQMC.get_rng(), beta, U}, "removal");
   CTQMC.add_measure(measure_M{&config, M_iw, beta}, "M measurement");
+  CTQMC.add_measure(measure_d{&config, d, CTQMC.get_rng(), beta}, "double occupancy measurement");
   CTQMC.add_measure(measure_histogram{&config, hist}, "histogram measurement");
   CTQMC.add_measure(measure_histogram_sign{&config, hist_sign}, "sign histogram measurement");
 

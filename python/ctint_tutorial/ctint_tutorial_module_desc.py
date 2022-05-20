@@ -31,7 +31,7 @@ c = class_(
 
 c.add_constructor("""(double beta_, int n_iw = 1024, int n_tau = 100001)""", doc = r"""Construct a ctint solver""")
 
-c.add_method("""void solve (double U, double delta, int n_cycles, int length_cycle = 50, int n_warmup_cycles = 5000, std::string random_name = \"\", int max_time = -1)""",
+c.add_method("""void solve (double U, double delta, int n_cycles, int length_cycle = 50, int n_warmup_cycles = 5000, std::string random_name = \"\", int max_time = -1, int seed = 34788)""",
              doc = r"""Method that performs the QMC calculation""")
 
 c.add_property(name = "G0_iw",
@@ -53,6 +53,14 @@ c.add_property(name = "Hist",
 c.add_property(name = "Hist_sign",
                 getter = cfunction("std::vector<dcomplex> Hist_sign ()"),
                 doc = r"""Access order sign histogram""")
+
+#c.add_property(name = "D0",
+#                getter = cfunction("dcomplex D0 ()"),
+#                doc = r"""Access bare double occupancy""")
+
+c.add_property(name = "D",
+                getter = cfunction("dcomplex D ()"),
+                doc = r"""Access double occupancy""")
 
 module.add_class(c)
 
@@ -88,6 +96,14 @@ c2.add_property(name = "Hist",
 c2.add_property(name = "Hist_sign",
                getter = cfunction("std::vector<dcomplex> Hist_sign ()"),
                doc = r"""Access order sign histogram""")
+
+c2.add_property(name = "D0",
+                getter = cfunction("dcomplex D0 ()"),
+                doc = r"""Access bare double occupancy""")
+
+c2.add_property(name = "D",
+                getter = cfunction("dcomplex D ()"),
+                doc = r"""Access double occupancy""")
 
 module.add_class(c2)
 
