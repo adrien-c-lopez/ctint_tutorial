@@ -27,13 +27,13 @@ struct g0bar_tau {
 // The Monte Carlo configuration
 struct configuration {
   // M-matrices for up and down
-  std::vector<triqs::det_manip::det_manip<g0bar_tau0>> Mmatrices;
+  std::vector<triqs::det_manip::det_manip<g0bar_tau>> Mmatrices;
 
   int perturbation_order() const { return Mmatrices[up].size(); }
 
   configuration(block_gf<imtime> &g0tilde_tau, double beta, double delta) {
     // Initialize the M-matrices. 100 is the initial matrix size
-    for (auto spin : {up, down}) Mmatrices.emplace_back(g0bar_tau0{g0tilde_tau[spin], beta, delta, spin}, 100);
+    for (auto spin : {up, down}) Mmatrices.emplace_back(g0bar_tau{g0tilde_tau[spin], beta, delta, spin}, 100);
   }
 };
 
@@ -132,23 +132,55 @@ struct measure_M {
   }
 };
 
+struct measure_n {
+
+  configuration *config; // Pointer to the MC configuration
+  std::vector<dcomplex> &n;        // reference to M-matrix
+  triqs::mc_tools::random_generator &rng;
+  dcomplex Z = 0;
+
+  measure_n(configuration *config_, std::vector<dcomplex> &n_, triqs::mc_tools::random_generator &rng_) : config(config_), n(n_), rng(rng_) { 
+    for (auto &n_s : n) n_s = 0;
+  }
+
+
+  void accumulate(dcomplex sign) {
+    Z += sign;
+    int k = config->perturbation_order();
+    arg_t t {0,0};
+
+    for (auto s : {up,down}) {
+      t.s = rng(2);
+      n[s] += sign*config->Mmatrices[s].try_insert(k,k,t,t);
+      config->Mmatrices[s].reject_last_try();
+    }
+  }
+
+  void collect_results(mpi::communicator const &c) {
+    n = mpi::all_reduce(n, c);
+    Z  = mpi::all_reduce(Z, c);
+    for (auto &n_s : n) n_s = n_s / Z;
+  }
+
+};
+
 struct measure_d {
 
   configuration *config; // Pointer to the MC configuration
   dcomplex &d;        // reference to M-matrix
   triqs::mc_tools::random_generator &rng;
-  double beta;
   dcomplex Z = 0;
 
-  measure_d(configuration *config_, dcomplex &d_, triqs::mc_tools::random_generator &rng_, double beta_) : config(config_), d(d_), rng(rng_), beta(beta_) { d = 0; }
+  measure_d(configuration *config_, dcomplex &d_, triqs::mc_tools::random_generator &rng_) : config(config_), d(d_), rng(rng_) { d = 0; }
 
   void accumulate(dcomplex sign) {
     Z += sign;
     dcomplex B = 1;
     int k = config->perturbation_order();
-    arg_t t {0,rng(2)};
+    arg_t t {0,0};
 
     for (auto &m : config->Mmatrices) {
+      t.s = rng(2);
       B *= m.try_insert(k,k,t,t);
       m.reject_last_try();
     }
@@ -160,8 +192,8 @@ struct measure_d {
     d = mpi::all_reduce(d, c);
     Z  = mpi::all_reduce(Z, c);
     d = d / Z;
-
   }
+
 };
 
 struct measure_histogram {
@@ -239,7 +271,7 @@ struct measure_histogram_sign {
     // Reduce histogram over all mpi threads
     histogram_sign = mpi::all_reduce(histogram_sign, comm);
 
-    for (auto &h_k : histogram_sign) h_k = h_k / histogram_sign[0];
+    //for (auto &h_k : histogram_sign) h_k = h_k / histogram_sign[0];
   }
 };
 // ------------ The main class of the solver ------------------------
@@ -254,12 +286,14 @@ solver::solver(double beta_, int n_iw, int n_tau)
      hist{std::vector<double>(2)},
      hist_sign{std::vector<dcomplex>(2)},
      //d0{0},
+     n{std::vector<dcomplex>(2)},
      d{0} {
        std::cout << "--------- /!\\ Using Solver /!\\ ---------\n";
      }
 
 // The method that runs the qmc
 void solver::solve(double U, double delta, int n_cycles, int length_cycle, int n_warmup_cycles, std::string random_name, int max_time, int seed) {
+  std::cout << "--------- /!\\ Using Solver /!\\ ---------\n";
 
   mpi::communicator world;
   triqs::clef::placeholder<0> spin_;
@@ -285,7 +319,8 @@ void solver::solve(double U, double delta, int n_cycles, int length_cycle, int n
   CTQMC.add_move(move_insert{&config, CTQMC.get_rng(), beta, U}, "insertion");
   CTQMC.add_move(move_remove{&config, CTQMC.get_rng(), beta, U}, "removal");
   CTQMC.add_measure(measure_M{&config, M_iw, beta}, "M measurement");
-  CTQMC.add_measure(measure_d{&config, d, CTQMC.get_rng(), beta}, "double occupancy measurement");
+  CTQMC.add_measure(measure_n{&config, n, CTQMC.get_rng()}, "n measurement");
+  CTQMC.add_measure(measure_d{&config, d, CTQMC.get_rng()}, "double occupancy measurement");
   CTQMC.add_measure(measure_histogram{&config, hist}, "histogram measurement");
   CTQMC.add_measure(measure_histogram_sign{&config, hist_sign}, "sign histogram measurement");
 

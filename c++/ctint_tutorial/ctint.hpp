@@ -41,6 +41,7 @@ namespace ctint_tutorial {
   std::vector<double> hist;
   std::vector<dcomplex> hist_sign;
   //dcomplex d0;
+  std::vector<dcomplex> n;
   dcomplex d;
 
   public:
@@ -61,6 +62,9 @@ namespace ctint_tutorial {
   //dcomplex D0() {return d0;};
 
   /// Access double occupancy
+  std::vector<dcomplex> N() {return n;};
+
+  /// Access double occupancy
   dcomplex D() {return d;};
 
   /// Construct a ctint solver
@@ -79,6 +83,7 @@ namespace ctint_tutorial {
   triqs::gfs::block_gf<imtime> g0tilde_tau;
   std::vector<double> hist;
   std::vector<dcomplex> hist_sign;
+  std::vector<dcomplex> n;
   dcomplex d0;
   dcomplex d;
 
@@ -95,6 +100,9 @@ namespace ctint_tutorial {
   /// Access order histogram
   std::vector<double> Hist() { return hist; };
   std::vector<dcomplex> Hist_sign() { return hist_sign; };
+
+  /// Access double occupancy
+  std::vector<dcomplex> N() {return n;};
 
   /// Access double occupancy
   dcomplex D0() {return d0;};

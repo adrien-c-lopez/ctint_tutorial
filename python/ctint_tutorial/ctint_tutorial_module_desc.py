@@ -54,6 +54,10 @@ c.add_property(name = "Hist_sign",
                 getter = cfunction("std::vector<dcomplex> Hist_sign ()"),
                 doc = r"""Access order sign histogram""")
 
+c.add_property(name = "N",
+               getter = cfunction("std::vector<dcomplex> N ()"),
+               doc = r"""Access density""")
+
 #c.add_property(name = "D0",
 #                getter = cfunction("dcomplex D0 ()"),
 #                doc = r"""Access bare double occupancy""")
@@ -96,6 +100,10 @@ c2.add_property(name = "Hist",
 c2.add_property(name = "Hist_sign",
                getter = cfunction("std::vector<dcomplex> Hist_sign ()"),
                doc = r"""Access order sign histogram""")
+
+c2.add_property(name = "N",
+               getter = cfunction("std::vector<dcomplex> N ()"),
+               doc = r"""Access density""")
 
 c2.add_property(name = "D0",
                 getter = cfunction("dcomplex D0 ()"),

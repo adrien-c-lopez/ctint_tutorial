@@ -28,8 +28,8 @@ struct g0bar_tau2 {
 // The Monte Carlo configuration
 struct configuration2 {
   // M-matrices for up and down
-  std::vector<triqs::det_manip::det_manip<g0bar_tau0>> Mmatrices_even;
-  std::vector<triqs::det_manip::det_manip<g0bar_tau0>> Mmatrices_odd;
+  std::vector<triqs::det_manip::det_manip<g0bar_tau2>> Mmatrices_even;
+  std::vector<triqs::det_manip::det_manip<g0bar_tau2>> Mmatrices_odd;
   dcomplex det_ratio;
   dcomplex d0;
 
@@ -93,10 +93,10 @@ struct configuration2 {
 
     double tau = 0;
     int s = 1;
-    std::vector<g0bar_tau0> g;
+    std::vector<g0bar_tau2> g;
 
     for (auto spin : {up, down}) {
-      g.emplace_back(g0bar_tau0{g0tilde_tau[spin], beta, delta, spin});
+      g.emplace_back(g0bar_tau2{g0tilde_tau[spin], beta, delta, spin});
       Mmatrices_even.emplace_back(g[spin], 100);
       Mmatrices_odd.emplace_back(g[spin], 100);
       det_ratio /= Mmatrices_odd[spin].insert_at_end({tau,s},{tau,s});
@@ -147,7 +147,7 @@ struct move_insert2 {
     tau0 = t0.tau;
     tau1 = t1.tau;
     int p0 = 1+rng(k+1);   // Choose one of the operators for insertion
-    int p1 = rng(p0);    // Choose one of the operators for insertion
+    int p1 = rng(p0);      // Choose one of the operators for insertion
     arg_t t2,t3;
     int p2,p3;
     if (p0<=k) {
@@ -313,16 +313,19 @@ struct measure_M2 {
   block_gf<imfreq> &Mw;  // reference to M-matrix
   double beta;
   double U;
-  dcomplex Z = 0;
-  long count = 0;
+  dcomplex Z;
+  long count;
+  block_gf<imfreq> &Kw;  // reference to M-matrix
 
-  measure_M2(configuration2 *config_, block_gf<imfreq> &Mw_, double beta_, double U_) : config(config_), Mw(Mw_), beta(beta_), U(U_) { Mw() = 0; }
+
+  measure_M2(configuration2 *config_, block_gf<imfreq> &Mw_, double beta_, double U_) : config(config_), Mw(Mw_), beta(beta_), U(U_), Z(0), count(0), Kw{Mw_} { Mw() = 0; }
 
   void accumulate(dcomplex sign) {
     Z += sign;
     count++;
     auto k = config->perturbation_order();
     config->set_det_ratio();
+    Kw()=0;
 
     for (auto spin : {up, down}) {
 
@@ -333,7 +336,7 @@ struct measure_M2 {
         auto coeff       = std::exp((mesh.first_index() + 1) * phase_step);
         auto fact        = std::exp(phase_step);
         for (auto const &om : mesh) {
-          this->Mw[spin][om] += sign * M * coeff * k * config->det_ratio / (this->beta * this->U);
+          this->Kw[spin][om](0, 0) += sign * M * coeff * k * config->det_ratio / (this->beta * this->U);
           coeff *= fact;
         }
       };
@@ -342,9 +345,9 @@ struct measure_M2 {
         auto const &mesh = this->Mw[spin].mesh();
         auto phase_step  = -2.0i * M_PI * (x.tau - y.tau) / beta;
         auto coeff       = std::exp(( mesh.first_index() + 1) * phase_step);
-        auto fact        = std::exp( phase_step);
+        auto fact        = std::exp(phase_step);
         for (auto const &om : mesh) {
-          this->Mw[spin][om] -=  sign * M * coeff;
+          this->Kw[spin][om](0, 0) -=  sign * M * coeff;
           coeff *= fact;
         }
       };
@@ -353,7 +356,9 @@ struct measure_M2 {
 
       foreach (config->Mmatrices_odd[spin], lambda_odd);
       
-      this->Mw[spin] /= std::abs(k * config->det_ratio / (beta * U) - 1);
+      Kw[spin] /= std::abs(k * config->det_ratio / (beta * U) - 1);
+
+      Mw[spin] += Kw[spin];
     }
   }
 
@@ -365,6 +370,50 @@ struct measure_M2 {
     // Print the sign
     if (c.rank() == 0) std::cerr << "Average sign " << Z / c.size() / count << std::endl;
   }
+};
+
+struct measure_n2 {
+
+  configuration2 *config; // Pointer to the MC configuration
+  std::vector<dcomplex> &n;        // reference to M-matrix
+  triqs::mc_tools::random_generator &rng;
+  double beta, U;
+  dcomplex Z = 0;
+
+  measure_n2(configuration2 *config_, std::vector<dcomplex> &n_, triqs::mc_tools::random_generator &rng_, double beta_, double U_) : config(config_), n(n_), rng(rng_), beta(beta_), U(U_) {
+    for (auto &n_s : n) n_s = 0; 
+  }
+
+  void accumulate(dcomplex sign) {
+    Z += sign;
+    int k = config->perturbation_order();
+    config->set_det_ratio();
+    arg_t t {0,0};
+    std::vector<dcomplex> m{std::vector<dcomplex>(2)};
+
+    for (auto s : {up,down}) {
+      t.s = rng(2);
+      m[s] += sign*config->Mmatrices_even[s].try_insert(k-1,k-1,t,t)*k* config->det_ratio / (beta * U);
+      config->Mmatrices_even[s].reject_last_try();
+    }
+
+    for (auto s : {up,down}) {
+      t.s = rng(2);
+      m[s] -= sign*config->Mmatrices_odd[s].try_insert(k,k,t,t);
+      config->Mmatrices_odd[s].reject_last_try();
+    }
+
+    for (auto &m_s : m) m_s /= std::abs(k * config->det_ratio / (beta * U) - 1);
+
+    for (auto s : {up,down}) n[s] += m[s];
+  }
+
+  void collect_results(mpi::communicator const &c) {
+    n = mpi::all_reduce(n, c);
+    Z  = mpi::all_reduce(Z, c);
+    for (auto &n_s : n) n_s /= Z;
+  }
+
 };
 
 struct measure_d2 {
@@ -383,13 +432,17 @@ struct measure_d2 {
     dcomplex B_odd = 1;
 
     int k = config->perturbation_order();
-    arg_t t {0,rng(2)};
+    config->set_det_ratio();
 
+    arg_t t {0,0};
+
+    t.s = rng(2);
     for (auto &m : config->Mmatrices_even) {
       B_even *= m.try_insert(k-1,k-1,t,t);
       m.reject_last_try();
     }
 
+    t.s = rng(2);
     for (auto &m : config->Mmatrices_odd) {
       B_odd *= m.try_insert(k,k,t,t);
       m.reject_last_try();
@@ -403,8 +456,8 @@ struct measure_d2 {
     d = mpi::all_reduce(d, c);
     Z  = mpi::all_reduce(Z, c);
     d = d / Z;
-
   }
+
 };
 
 struct measure_histogram2 {
@@ -455,7 +508,9 @@ struct measure_histogram_sign2 {
   std::vector<dcomplex> &histogram_sign;
 
   measure_histogram_sign2(configuration2 const *config_, std::vector<dcomplex> &histogram_sign_, double beta_, double U_)
-      : config(config_), histogram_sign(histogram_sign_), beta(beta_), U(U_) {histogram_sign = std::vector<dcomplex>(2);}
+      : config(config_), histogram_sign(histogram_sign_), beta(beta_), U(U_) {
+        histogram_sign = std::vector<dcomplex>(2);
+        for (auto &h_k : histogram_sign) h_k=0;}
 
   /// Accumulate perturbation order into histogram
   void accumulate(dcomplex sign) {
@@ -491,6 +546,7 @@ solver2::solver2(double beta_, int n_iw, int n_tau)
      g0tilde_tau{make_block_gf({"up", "down"}, gf<imtime>{{beta, Fermion, n_tau}, {1, 1}})}, 
      hist{std::vector<double>(2)},
      hist_sign{std::vector<dcomplex>(2)},
+     n{std::vector<dcomplex>(2)},
      d0{0},
      d{0} {
       std::cout << "--------- /!\\ Using Solver2 /!\\ ---------\n";
@@ -498,6 +554,7 @@ solver2::solver2(double beta_, int n_iw, int n_tau)
 
 // The method that runs the qmc
 void solver2::solve(double U, double delta, int n_cycles, int length_cycle, int n_warmup_cycles, std::string random_name, int max_time, int seed) {
+  std::cout << "--------- /!\\ Using Solver2 /!\\ ---------\n";
 
   mpi::communicator world;
   triqs::clef::placeholder<0> spin_;
@@ -524,6 +581,7 @@ void solver2::solve(double U, double delta, int n_cycles, int length_cycle, int 
   CTQMC.add_move(move_insert2{&config, CTQMC.get_rng(), beta, U}, "insertion");
   CTQMC.add_move(move_remove2{&config, CTQMC.get_rng(), beta, U}, "removal");
   CTQMC.add_measure(measure_M2{&config, M_iw, beta, U}, "M measurement");
+  CTQMC.add_measure(measure_n2{&config, n, CTQMC.get_rng(), beta, U}, "n measurement");
   CTQMC.add_measure(measure_d2{&config, d, CTQMC.get_rng(), beta, U}, "double occupancy measurement");
   CTQMC.add_measure(measure_histogram2{&config, hist}, "histogram measurement");
   CTQMC.add_measure(measure_histogram_sign2{&config, hist_sign, beta, U}, "sign histogram measurement");
