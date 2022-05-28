@@ -31,7 +31,7 @@ c = class_(
 
 c.add_constructor("""(double beta_, int n_iw = 1024, int n_tau = 100001)""", doc = r"""Construct a ctint solver""")
 
-c.add_method("""void solve (double U, double delta, int n_cycles, int length_cycle = 50, int n_warmup_cycles = 5000, std::string random_name = \"\", int max_time = -1, int seed = 34788)""",
+c.add_method("""void solve (double U, double delta, double delta0, int n_cycles, int length_cycle = 50, int n_warmup_cycles = 5000, std::string random_name = \"\", int max_time = -1, int seed = 34788)""",
              doc = r"""Method that performs the QMC calculation""")
 
 c.add_property(name = "G0_iw",
@@ -78,7 +78,7 @@ c2 = class_(
 
 c2.add_constructor("""(double beta_, int n_iw = 1024, int n_tau = 100001)""", doc = r"""Construct a ctint solver""")
 
-c2.add_method("""void solve (double U, double delta, int n_cycles, int length_cycle = 50, int n_warmup_cycles = 5000, std::string random_name = \"\", int max_time = -1, int seed = 34788)""",
+c2.add_method("""void solve (double U, double delta, double delta0, int n_cycles, int length_cycle = 50, int n_warmup_cycles = 5000, std::string random_name = \"\", int max_time = -1, int seed = 34788)""",
              doc = r"""Method that performs the QMC calculation""")
 
 c2.add_property(name = "G0_iw",
@@ -105,9 +105,9 @@ c2.add_property(name = "N",
                getter = cfunction("std::vector<dcomplex> N ()"),
                doc = r"""Access density""")
 
-c2.add_property(name = "D0",
-                getter = cfunction("dcomplex D0 ()"),
-                doc = r"""Access bare double occupancy""")
+#c2.add_property(name = "D0",
+#                getter = cfunction("dcomplex D0 ()"),
+#                doc = r"""Access bare double occupancy""")
 
 c2.add_property(name = "D",
                 getter = cfunction("dcomplex D ()"),

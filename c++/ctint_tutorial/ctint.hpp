@@ -16,22 +16,23 @@ namespace ctint_tutorial {
     int s;      // The auxiliary spin
   };
 
-  struct g0bar_tau0 {
-    gf<imtime> const &gt;
-    double beta, delta;
-    int s;
+// The function that appears in the calculation of the determinant
+struct g0bar_tau {
+  gf<imtime> const &gt;
+  double beta, delta, delta0;
+  int s;
 
-    dcomplex operator()(arg_t const &x, arg_t const &y) const {
-      if ((x.tau == y.tau)) { // G_\sigma(0^-)
-        return 1.0 + gt[0](0, 0);
-      }
-      auto x_y = x.tau - y.tau;
-      bool b   = (x_y >= 0);
-      if (!b) x_y += beta;
-      dcomplex res = gt[closest_mesh_pt(x_y)](0, 0);
-      return (b ? res : -res); // take into account antiperiodicity
+  dcomplex operator()(arg_t const &x, arg_t const &y) const {
+    if ((x.tau == y.tau)) { // G_\sigma(0^-) - \alpha(\sigma s)
+      return 1.0 + gt[0](0, 0) - (delta0 + (2 * (s == x.s ? 1 : 0) - 1) * delta);
     }
-  };
+    auto x_y = x.tau - y.tau;
+    bool b   = (x_y >= 0);
+    if (!b) x_y += beta;
+    dcomplex res = gt[closest_mesh_pt(x_y)](0, 0);
+    return (b ? res : -res); // take into account antiperiodicity
+  }
+};
 
   class solver {
 
@@ -71,7 +72,7 @@ namespace ctint_tutorial {
   solver(double beta_, int n_iw = 1024, int n_tau = 100001);
 
   /// Method that performs the QMC calculation
-  void solve(double U, double delta, int n_cycles, int length_cycle = 50, int n_warmup_cycles = 5000, std::string random_name = "",
+  void solve(double U, double delta, double delta0=.5, int n_cycles=10000, int length_cycle = 50, int n_warmup_cycles = 5000, std::string random_name = "",
               int max_time = -1, int seed=34788);
 
   };
@@ -84,7 +85,6 @@ namespace ctint_tutorial {
   std::vector<double> hist;
   std::vector<dcomplex> hist_sign;
   std::vector<dcomplex> n;
-  dcomplex d0;
   dcomplex d;
 
   public:
@@ -105,7 +105,7 @@ namespace ctint_tutorial {
   std::vector<dcomplex> N() {return n;};
 
   /// Access double occupancy
-  dcomplex D0() {return d0;};
+  //dcomplex D0() {return d0;};
 
   /// Access double occupancy
   dcomplex D() {return d;};
@@ -114,7 +114,7 @@ namespace ctint_tutorial {
   solver2(double beta_, int n_iw = 1024, int n_tau = 100001);
 
   /// Method that performs the QMC calculation
-  void solve(double U, double delta, int n_cycles, int length_cycle = 50, int n_warmup_cycles = 5000, std::string random_name = "",
+  void solve(double U, double delta, double delta0=.5, int n_cycles=10000, int length_cycle = 50, int n_warmup_cycles = 5000, std::string random_name = "",
               int max_time = -1, int seed=34788);
   };
   
