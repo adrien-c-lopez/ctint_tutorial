@@ -41,9 +41,10 @@ struct g0bar_tau {
   triqs::gfs::block_gf<imtime> g0tilde_tau;
   std::vector<double> hist;
   std::vector<dcomplex> hist_sign;
-  //dcomplex d0;
   std::vector<dcomplex> n;
+  std::vector<dcomplex> hist_n;
   dcomplex d;
+  std::vector<dcomplex> hist_d;
 
   public:
   /// Access non-interacting Matsubara Green function
@@ -65,8 +66,14 @@ struct g0bar_tau {
   /// Access double occupancy
   std::vector<dcomplex> N() {return n;};
 
+  /// Access double occupancy histogram
+  std::vector<dcomplex> Hist_n() { return hist_n; };
+
   /// Access double occupancy
   dcomplex D() {return d;};
+
+  /// Access double occupancy histogram
+  std::vector<dcomplex> Hist_d() { return hist_d; };
 
   /// Construct a ctint solver
   solver(double beta_, int n_iw = 1024, int n_tau = 100001);
@@ -85,7 +92,9 @@ struct g0bar_tau {
   std::vector<double> hist;
   std::vector<dcomplex> hist_sign;
   std::vector<dcomplex> n;
+  std::vector<dcomplex> hist_n;
   dcomplex d;
+  std::vector<dcomplex> hist_d;
 
   public:
   /// Access non-interacting Matsubara Green function
@@ -103,12 +112,16 @@ struct g0bar_tau {
 
   /// Access double occupancy
   std::vector<dcomplex> N() {return n;};
+  std::vector<dcomplex> Hist_n() { return hist_n; };
 
   /// Access double occupancy
   //dcomplex D0() {return d0;};
 
   /// Access double occupancy
   dcomplex D() {return d;};
+
+  /// Access double occupancy histogram
+  std::vector<dcomplex> Hist_d() { return hist_d; };
 
   /// Construct a ctint solver
   solver2(double beta_, int n_iw = 1024, int n_tau = 100001);

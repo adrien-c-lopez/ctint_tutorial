@@ -58,14 +58,18 @@ c.add_property(name = "N",
                getter = cfunction("std::vector<dcomplex> N ()"),
                doc = r"""Access density""")
 
-#c.add_property(name = "D0",
-#                getter = cfunction("dcomplex D0 ()"),
-#                doc = r"""Access bare double occupancy""")
+c.add_property(name = "Hist_n",
+               getter = cfunction("std::vector<dcomplex> Hist_n ()"),
+               doc = r"""Access order density histogram""")
 
 c.add_property(name = "D",
                 getter = cfunction("dcomplex D ()"),
                 doc = r"""Access double occupancy""")
 
+c.add_property(name = "Hist_d",
+               getter = cfunction("std::vector<dcomplex> Hist_d ()"),
+               doc = r"""Access order double occupancy histogram""")
+               
 module.add_class(c)
 
 # The class solver2
@@ -105,13 +109,17 @@ c2.add_property(name = "N",
                getter = cfunction("std::vector<dcomplex> N ()"),
                doc = r"""Access density""")
 
-#c2.add_property(name = "D0",
-#                getter = cfunction("dcomplex D0 ()"),
-#                doc = r"""Access bare double occupancy""")
+c2.add_property(name = "Hist_n",
+               getter = cfunction("std::vector<dcomplex> Hist_n ()"),
+               doc = r"""Access order density histogram""")
 
 c2.add_property(name = "D",
                 getter = cfunction("dcomplex D ()"),
                 doc = r"""Access double occupancy""")
+
+c2.add_property(name = "Hist_d",
+               getter = cfunction("std::vector<dcomplex> Hist_d ()"),
+               doc = r"""Access order double occupancy histogram""")
 
 module.add_class(c2)
 

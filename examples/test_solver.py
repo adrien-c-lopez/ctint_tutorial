@@ -8,8 +8,8 @@ from numpy.random import rand,randint
 from ctint_tutorial import Solver, Solver2
 
 # Parameters
-beta = 5             # Inverse temperature
-U = 6                # Hubbard interaction
+beta = 1.5             # Inverse temperature
+U = 2.5                # Hubbard interaction
 mu = U/2            # Chemical potential
 half_bandwidth=1.0   # Half bandwidth (energy unit)
 n_iw = 128           # Number of Matsubara frequencies
@@ -20,11 +20,13 @@ n_warmup_cycles = 5000
 N = 10               # Number of solver samples
 r = randint(0,100000,size=N)
 
-nid = 1
-
-for id in range(nid):
-   delta = .1
-   delta0 = .5
+nid = 2
+id0 = 8
+deltas = [0.,.01]
+delta0s = [0,.5]
+for id in range(id0,id0+nid):
+   delta = deltas[id-id0]
+   delta0 = delta0s[id-id0]
 
    print(f"id: {id+1} of {nid}")
    print(f"beta = {beta}")
@@ -54,12 +56,14 @@ for id in range(nid):
                A[f'U'] = U
                A[f'delta'] = delta
                A[f'delta0'] = delta0
-               A[f'G0_iw_{k}'] = S.G0_iw
                A[f'hist_{k}'] = S.Hist
                A[f'hist_sign_{k}'] = S.Hist_sign
                A[f'n_{k}'] = S.N
+               A[f'hist_n_{k}'] = S.Hist_n
                A[f'd_{k}'] = S.D
-               A[f'G_iw_{k}'] = G_sym 
+               A[f'hist_d_{k}'] = S.Hist_d
+               #A[f'G0_iw_{k}'] = S.G0_iw
+               #A[f'G_iw_{k}'] = G_sym 
 
 
    if True:
@@ -83,9 +87,11 @@ for id in range(nid):
                A[f'U'] = U
                A[f'delta'] = delta
                A[f'delta0'] = delta0
-               A[f'G0_iw_{k}'] = S.G0_iw
                A[f'hist_{k}'] = S.Hist
                A[f'hist_sign_{k}'] = S.Hist_sign
                A[f'n_{k}'] = S.N
+               A[f'hist_n_{k}'] = S.Hist_n
                A[f'd_{k}'] = S.D
-               A[f'G_iw_{k}'] = G_sym 
+               A[f'hist_d_{k}'] = S.Hist_d
+               #A[f'G0_iw_{k}'] = S.G0_iw
+               #A[f'G_iw_{k}'] = G_sym 

@@ -70,116 +70,6 @@ struct move_remove {
 };
 
 //  -------------- QMC measurement ----------------
-
-struct measure_M {
-
-  configuration const *config; // Pointer to the MC configuration
-  block_gf<imfreq> &Mw;        // reference to M-matrix
-  double beta;
-  dcomplex Z = 0;
-  long count = 0;
-
-  measure_M(configuration const *config_, block_gf<imfreq> &Mw_, double beta_) : config(config_), Mw(Mw_), beta(beta_) { Mw() = 0; }
-
-  void accumulate(dcomplex sign) {
-    Z += sign;
-    count++;
-
-    for (auto spin : {up, down}) {
-
-      // A lambda to measure the M-matrix in frequency
-      auto lambda = [this, spin, sign](arg_t const &x, arg_t const &y, dcomplex M) {
-        auto const &mesh = this->Mw[spin].mesh();
-        auto phase_step  = -1.0i * M_PI * (x.tau - y.tau) / beta;
-        auto coeff       = std::exp((2 * mesh.first_index() + 1) * phase_step);
-        auto fact        = std::exp(2 * phase_step);
-        for (auto const &om : mesh) {
-          this->Mw[spin][om](0, 0) += sign * M * coeff;
-          coeff *= fact;
-        }
-      };
-
-      foreach (config->Mmatrices[spin], lambda)
-        ;
-    }
-  }
-
-  void collect_results(mpi::communicator const &c) {
-    Mw = mpi::all_reduce(Mw, c);
-    Z  = mpi::all_reduce(Z, c);
-    Mw = Mw / (-Z * beta);
-
-    // Print the sign
-    if (c.rank() == 0) std::cerr << "Average sign " << Z / c.size() / count << std::endl;
-  }
-};
-
-struct measure_n {
-
-  configuration *config; // Pointer to the MC configuration
-  std::vector<dcomplex> &n;        // reference to M-matrix
-  dcomplex Z;
-
-  measure_n(configuration *config_, std::vector<dcomplex> &n_) : config(config_), n(n_) { 
-    for (auto &n_s : n) n_s = 0;
-    Z=0;
-  }
-
-
-  void accumulate(dcomplex sign) {
-    Z += sign;
-    int k = config->perturbation_order();
-    arg_t t {0,0};
-    for (auto s : {0,1}) {
-      t.s = s;
-      for (auto spin : {up,down}) {
-        n[spin] += sign*config->Mmatrices[spin].try_insert(k,k,t,t)/2;
-        config->Mmatrices[spin].reject_last_try();
-      }
-    }
-  }
-
-  void collect_results(mpi::communicator const &c) {
-    n = mpi::all_reduce(n, c);
-    Z  = mpi::all_reduce(Z, c);
-    for (auto &n_s : n) n_s = n_s / Z;
-  }
-
-};
-
-struct measure_d {
-
-  configuration *config; // Pointer to the MC configuration
-  dcomplex &d;        // reference to M-matrix
-  dcomplex Z;
-
-  measure_d(configuration *config_, dcomplex &d_) : config(config_), d(d_) { d=0; Z=0;}
-
-  void accumulate(dcomplex sign) {
-    Z += sign;
-    dcomplex B;
-    int k = config->perturbation_order();
-    arg_t t {0.,0};
-
-    for (auto s : {0,1}) {
-      t.s = s;
-      B = 1.;
-      for (auto &m : config->Mmatrices) {
-          B *= m.try_insert(k,k,t,t);
-          m.reject_last_try();
-      }
-      d += sign*B/2;
-    }
-  }
-
-  void collect_results(mpi::communicator const &c) {
-    d = mpi::all_reduce(d, c);
-    Z  = mpi::all_reduce(Z, c);
-    d = d / Z;
-  }
-
-};
-
 struct measure_histogram {
 
   // The Monte-Carlo configuration
@@ -258,6 +148,215 @@ struct measure_histogram_sign {
     //for (auto &h_k : histogram_sign) h_k = h_k / histogram_sign[0];
   }
 };
+
+struct measure_n {
+
+  configuration *config; // Pointer to the MC configuration
+  std::vector<dcomplex> &n;        // reference to M-matrix
+  dcomplex Z;
+
+  measure_n(configuration *config_, std::vector<dcomplex> &n_) : config(config_), n(n_) { 
+    for (auto &n_s : n) n_s = 0;
+    Z=0;
+  }
+
+
+  void accumulate(dcomplex sign) {
+    Z += sign;
+    int k = config->perturbation_order();
+    arg_t t {0,0};
+    for (auto s : {0,1}) {
+      t.s = s;
+      for (auto spin : {up,down}) {
+        n[spin] += sign*config->Mmatrices[spin].try_insert(k,k,t,t)/2;
+        config->Mmatrices[spin].reject_last_try();
+      }
+    }
+  }
+
+  void collect_results(mpi::communicator const &c) {
+    n = mpi::all_reduce(n, c);
+    Z  = mpi::all_reduce(Z, c);
+    for (auto &n_s : n) n_s = n_s / Z;
+  }
+
+};
+
+struct measure_histogram_n {
+
+  // The Monte-Carlo configuration
+  configuration *config; // Pointer to the MC configuration
+
+  // Reference to accumulation vector
+  std::vector<dcomplex> &histogram_n;
+  dcomplex Z;
+
+
+  measure_histogram_n(configuration *config_, std::vector<dcomplex> &histogram_n_)
+      : config(config_), histogram_n(histogram_n_) {histogram_n = std::vector<dcomplex>(2); Z=0;}
+
+  /// Accumulate perturbation order into histogram
+  void accumulate(dcomplex sign) {
+    //std::cout << "accumulating  ";
+    Z += sign;
+    int k = config->perturbation_order();
+    while (k >= histogram_n.size()) histogram_n.resize(2 * histogram_n.size());
+
+    arg_t t {0,0};
+    for (auto s : {0,1}) {
+      t.s = s;
+      for (auto spin : {up,down}) {
+        histogram_n[k] += sign*config->Mmatrices[spin].try_insert(k,k,t,t)/2;
+        config->Mmatrices[spin].reject_last_try();
+      }
+    }
+  }
+
+  /// Reduce and normalize
+  void collect_results(mpi::communicator const &comm) {
+    std::cout << "collecting  ";
+  
+    // Make sure that all mpi threads have an equally sized histogram
+    auto max_k_vec         = std::vector<size_t>(comm.size());
+    max_k_vec[comm.rank()] = histogram_n.size();
+    max_k_vec              = mpi::all_reduce(max_k_vec, comm);
+    histogram_n.resize(*std::max_element(max_k_vec.begin(), max_k_vec.end()));
+
+    // Reduce histogram over all mpi threads
+    histogram_n = mpi::all_reduce(histogram_n, comm);
+    Z  = mpi::all_reduce(Z, comm);
+
+    for (auto &h_k : histogram_n) h_k = h_k / Z;
+  }
+};
+
+struct measure_d {
+
+  configuration *config; // Pointer to the MC configuration
+  dcomplex &d;        // reference to M-matrix
+  dcomplex Z;
+
+  measure_d(configuration *config_, dcomplex &d_) : config(config_), d(d_) { d=0; Z=0;}
+
+  void accumulate(dcomplex sign) {
+    Z += sign;
+    dcomplex B;
+    int k = config->perturbation_order();
+    arg_t t {0.,0};
+
+    for (auto s : {0,1}) {
+      t.s = s;
+      B = 1.;
+      for (auto &m : config->Mmatrices) {
+          B *= m.try_insert(k,k,t,t);
+          m.reject_last_try();
+      }
+      d += sign*B/2;
+    }
+  }
+
+  void collect_results(mpi::communicator const &c) {
+    d = mpi::all_reduce(d, c);
+    Z  = mpi::all_reduce(Z, c);
+    d = d / Z;
+  }
+
+};
+
+struct measure_histogram_d {
+
+  // The Monte-Carlo configuration
+  configuration *config; // Pointer to the MC configuration
+
+  // Reference to accumulation vector
+  std::vector<dcomplex> &histogram_d;
+  dcomplex Z;
+
+
+  measure_histogram_d(configuration *config_, std::vector<dcomplex> &histogram_d_)
+      : config(config_), histogram_d(histogram_d_) {histogram_d = std::vector<dcomplex>(2); Z=0;}
+
+  /// Accumulate perturbation order into histogram
+  void accumulate(dcomplex sign) {
+    //std::cout << "accumulating  ";
+    Z += sign;
+    dcomplex B;
+    int k = config->perturbation_order();
+    while (k >= histogram_d.size()) histogram_d.resize(2 * histogram_d.size());
+
+    arg_t t {0.,0};
+    for (auto s : {0,1}) {
+      t.s = s;
+      B = 1.;
+      for (auto &m : config->Mmatrices) {
+          B *= m.try_insert(k,k,t,t);
+          m.reject_last_try();
+      }
+      histogram_d[k] += sign*B/2;
+      }
+    }
+
+  /// Reduce and normalize
+  void collect_results(mpi::communicator const &comm) {
+    std::cout << "collecting  ";
+  
+    // Make sure that all mpi threads have an equally sized histogram
+    auto max_k_vec         = std::vector<size_t>(comm.size());
+    max_k_vec[comm.rank()] = histogram_d.size();
+    max_k_vec              = mpi::all_reduce(max_k_vec, comm);
+    histogram_d.resize(*std::max_element(max_k_vec.begin(), max_k_vec.end()));
+
+    // Reduce histogram over all mpi threads
+    histogram_d = mpi::all_reduce(histogram_d, comm);
+    Z  = mpi::all_reduce(Z, comm);
+
+    for (auto &h_k : histogram_d) h_k = h_k / Z;
+  }
+};
+
+struct measure_M {
+
+  configuration const *config; // Pointer to the MC configuration
+  block_gf<imfreq> &Mw;        // reference to M-matrix
+  double beta;
+  dcomplex Z = 0;
+  long count = 0;
+
+  measure_M(configuration const *config_, block_gf<imfreq> &Mw_, double beta_) : config(config_), Mw(Mw_), beta(beta_) { Mw() = 0; }
+
+  void accumulate(dcomplex sign) {
+    Z += sign;
+    count++;
+
+    for (auto spin : {up, down}) {
+
+      // A lambda to measure the M-matrix in frequency
+      auto lambda = [this, spin, sign](arg_t const &x, arg_t const &y, dcomplex M) {
+        auto const &mesh = this->Mw[spin].mesh();
+        auto phase_step  = -1.0i * M_PI * (x.tau - y.tau) / beta;
+        auto coeff       = std::exp((2 * mesh.first_index() + 1) * phase_step);
+        auto fact        = std::exp(2 * phase_step);
+        for (auto const &om : mesh) {
+          this->Mw[spin][om](0, 0) += sign * M * coeff;
+          coeff *= fact;
+        }
+      };
+
+      foreach (config->Mmatrices[spin], lambda)
+        ;
+    }
+  }
+
+  void collect_results(mpi::communicator const &c) {
+    Mw = mpi::all_reduce(Mw, c);
+    Z  = mpi::all_reduce(Z, c);
+    Mw = Mw / (-Z * beta);
+
+    // Print the sign
+    if (c.rank() == 0) std::cerr << "Average sign " << Z / c.size() / count << std::endl;
+  }
+};
+
 // ------------ The main class of the solver ------------------------
 
 solver::solver(double beta_, int n_iw, int n_tau)
@@ -271,7 +370,9 @@ solver::solver(double beta_, int n_iw, int n_tau)
      hist_sign{std::vector<dcomplex>(2)},
      //d0{0},
      n{std::vector<dcomplex>(2)},
-     d{0} {
+     hist_n{std::vector<dcomplex>(2)},
+     d{0},
+     hist_d{std::vector<dcomplex>(2)}{
        std::cout << "--------- /!\\ Using Solver /!\\ ---------\n";
      }
 
@@ -302,11 +403,14 @@ void solver::solve(double U, double delta, double delta0, int n_cycles, int leng
   // Register moves and measurements
   CTQMC.add_move(move_insert{&config, CTQMC.get_rng(), beta, U}, "insertion");
   CTQMC.add_move(move_remove{&config, CTQMC.get_rng(), beta, U}, "removal");
-  CTQMC.add_measure(measure_M{&config, M_iw, beta}, "M measurement");
-  CTQMC.add_measure(measure_n{&config, n}, "n measurement");
-  CTQMC.add_measure(measure_d{&config, d}, "double occupancy measurement");
   CTQMC.add_measure(measure_histogram{&config, hist}, "histogram measurement");
   CTQMC.add_measure(measure_histogram_sign{&config, hist_sign}, "sign histogram measurement");
+  CTQMC.add_measure(measure_n{&config, n}, "n measurement");
+  CTQMC.add_measure(measure_histogram_n{&config, hist_n}, "n histogram measurement");
+  CTQMC.add_measure(measure_d{&config, d}, "double occupancy measurement");
+  CTQMC.add_measure(measure_histogram_d{&config, hist_d}, "double occupancy histogram measurement");
+  //CTQMC.add_measure(measure_M{&config, M_iw, beta}, "M measurement");
+
 
   // Run and collect results
   CTQMC.warmup_and_accumulate(n_warmup_cycles, n_cycles, length_cycle, triqs::utility::clock_callback(max_time));
