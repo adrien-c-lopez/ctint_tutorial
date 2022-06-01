@@ -357,6 +357,100 @@ struct measure_M {
   }
 };
 
+struct measure_Mk {
+
+  configuration const *config; // Pointer to the MC configuration
+  block_gf<imfreq> &Mkw;        // reference to M-matrix
+  int k;
+  double beta;
+  dcomplex Z;
+  long count;
+
+  measure_Mk(configuration const *config_, block_gf<imfreq> &Mkw_, int k_, double beta_) : config(config_), Mkw(Mkw_), k(k_), beta(beta_) { Mkw() = 0; Z=0; count=0;}
+
+  void accumulate(dcomplex sign) {
+    Z += sign;
+    count++;
+
+    if (config->perturbation_order()==k || config->perturbation_order()==k-1) {
+
+      for (auto spin : {up, down}) {
+
+        // A lambda to measure the M-matrix in frequency
+        auto lambda = [this, spin, sign](arg_t const &x, arg_t const &y, dcomplex M) {
+          auto const &mesh = this->Mkw[spin].mesh();
+          auto phase_step  = -1.0i * M_PI * (x.tau - y.tau) / beta;
+          auto coeff       = std::exp((2 * mesh.first_index() + 1) * phase_step);
+          auto fact        = std::exp(2 * phase_step);
+          for (auto const &om : mesh) {
+            this->Mkw[spin][om](0, 0) += sign * M * coeff;
+            coeff *= fact;
+          }
+        };
+
+        foreach (config->Mmatrices[spin], lambda);
+      }
+    }
+  }
+
+  void collect_results(mpi::communicator const &c) {
+    Mkw = mpi::all_reduce(Mkw, c);
+    Z  = mpi::all_reduce(Z, c);
+    Mkw = Mkw / (-Z * beta);
+
+    // Print the sign
+    if (c.rank() == 0) std::cerr << "Average sign " << Z / c.size() / count << std::endl;
+  }
+};
+/*
+struct measure_M_wn {
+
+  configuration const *config; // Pointer to the MC configuration
+  std::vector<dcomplex> &histogram_m;
+  int n;
+  double beta;
+  dcomplex Z;
+  long count;
+
+  measure_M_wn(configuration const *config_, std::vector<dcomplex> &histogram_m_, int n_, double beta_) : config(config_), histogram_m(histogram_m_), n(n_), beta(beta_) {
+    histogram_m = std::vector<dcomplex>(2); Z=0; count=0;
+  }
+
+  void accumulate(dcomplex sign) {
+    Z += sign;
+    count++;
+    int k = config->perturbation_order();
+    while (k >= histogram_m.size()) histogram_m.resize(2 * histogram_m.size());
+
+    for (auto spin : {up, down}) {
+
+      // A lambda to measure the M-matrix in frequency
+      auto lambda = [this, spin, sign, k](arg_t const &x, arg_t const &y, dcomplex M) {
+        auto phase_step  = -1.0i * M_PI * (x.tau - y.tau) / beta;
+        auto coeff       = std::exp((2 * this->n + 1) * phase_step);
+        this->histogram_m[k] += sign * M * coeff;
+      };
+
+      foreach (config->Mmatrices[spin], lambda)
+        ;
+    }
+  }
+
+  void collect_results(mpi::communicator const &comm) {
+    // Make sure that all mpi threads have an equally sized histogram
+    auto max_k_vec         = std::vector<size_t>(comm.size());
+    max_k_vec[comm.rank()] = histogram_m.size();
+    max_k_vec              = mpi::all_reduce(max_k_vec, comm);
+    histogram_m.resize(*std::max_element(max_k_vec.begin(), max_k_vec.end()));
+
+    // Reduce histogram over all mpi threads
+    histogram_m = mpi::all_reduce(histogram_m, comm);
+    Z  = mpi::all_reduce(Z, comm);
+
+    for (auto &h_k : histogram_m) h_k = h_k / (-Z * beta);
+  }
+};
+*/
 // ------------ The main class of the solver ------------------------
 
 solver::solver(double beta_, int n_iw, int n_tau)
@@ -364,20 +458,22 @@ solver::solver(double beta_, int n_iw, int n_tau)
      g0_iw{make_block_gf({"up", "down"}, gf<imfreq>{{beta, Fermion, n_iw}, {1, 1}})},
      g0tilde_iw{g0_iw},
      g_iw{g0_iw},
-     M_iw{g0_iw},
+     m_iw{g0_iw},
+     mk_iw{g0_iw},
      g0tilde_tau{make_block_gf({"up", "down"}, gf<imtime>{{beta, Fermion, n_tau}, {1, 1}})},
      hist{std::vector<double>(2)},
      hist_sign{std::vector<dcomplex>(2)},
-     //d0{0},
      n{std::vector<dcomplex>(2)},
      hist_n{std::vector<dcomplex>(2)},
      d{0},
-     hist_d{std::vector<dcomplex>(2)}{
+     hist_d{std::vector<dcomplex>(2)}
+     //hist_m{std::vector<dcomplex>(2)}
+     {
        std::cout << "--------- /!\\ Using Solver /!\\ ---------\n";
      }
 
 // The method that runs the qmc
-void solver::solve(double U, double delta, double delta0, int n_cycles, int length_cycle, int n_warmup_cycles, std::string random_name, int max_time, int seed) {
+void solver::solve(double U, double delta, double delta0, int k, int n_cycles, int length_cycle, int n_warmup_cycles, std::string random_name, int max_time, int seed) {
   std::cout << "--------- /!\\ Using Solver /!\\ ---------\n";
 
   mpi::communicator world;
@@ -409,7 +505,9 @@ void solver::solve(double U, double delta, double delta0, int n_cycles, int leng
   CTQMC.add_measure(measure_histogram_n{&config, hist_n}, "n histogram measurement");
   CTQMC.add_measure(measure_d{&config, d}, "double occupancy measurement");
   CTQMC.add_measure(measure_histogram_d{&config, hist_d}, "double occupancy histogram measurement");
-  //CTQMC.add_measure(measure_M{&config, M_iw, beta}, "M measurement");
+  CTQMC.add_measure(measure_M{&config, m_iw, beta}, "M measurement");
+  if (k > 0)
+    CTQMC.add_measure(measure_Mk{&config, mk_iw, k, beta}, "M kth order measurement");
 
 
   // Run and collect results
@@ -417,7 +515,7 @@ void solver::solve(double U, double delta, double delta0, int n_cycles, int leng
   CTQMC.collect_results(world);
 
   // Compute the Green function from Mw
-  g_iw[spin_](om_) << g0tilde_iw[spin_](om_) + g0tilde_iw[spin_](om_) * M_iw[spin_](om_) * g0tilde_iw[spin_](om_);
+  g_iw[spin_](om_) << g0tilde_iw[spin_](om_) + g0tilde_iw[spin_](om_) * m_iw[spin_](om_) * g0tilde_iw[spin_](om_);
 
   // Set the tail of g_iw to 1/w
   triqs::arrays::array<dcomplex, 3> mom{{{0}}, {{1}}}; // 0 + 1/omega

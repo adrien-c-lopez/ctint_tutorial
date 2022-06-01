@@ -37,7 +37,7 @@ struct g0bar_tau {
   class solver {
 
   double beta;
-  triqs::gfs::block_gf<imfreq> g0_iw, g0tilde_iw, g_iw, M_iw; //M_iw is the interacting Green's function kernel
+  triqs::gfs::block_gf<imfreq> g0_iw, g0tilde_iw, g_iw, m_iw, mk_iw; //M_iw is the interacting Green's function kernel
   triqs::gfs::block_gf<imtime> g0tilde_tau;
   std::vector<double> hist;
   std::vector<dcomplex> hist_sign;
@@ -45,6 +45,7 @@ struct g0bar_tau {
   std::vector<dcomplex> hist_n;
   dcomplex d;
   std::vector<dcomplex> hist_d;
+  //std::vector<dcomplex> hist_m;
 
   public:
   /// Access non-interacting Matsubara Green function
@@ -75,11 +76,17 @@ struct g0bar_tau {
   /// Access double occupancy histogram
   std::vector<dcomplex> Hist_d() { return hist_d; };
 
+  triqs::gfs::block_gf_view<imfreq> M_iw() { return m_iw; }
+
+  triqs::gfs::block_gf_view<imfreq> Mk_iw() { return mk_iw; }
+
+  //std::vector<dcomplex> Hist_m() { return hist_m; };
+
   /// Construct a ctint solver
   solver(double beta_, int n_iw = 1024, int n_tau = 100001);
 
   /// Method that performs the QMC calculation
-  void solve(double U, double delta, double delta0=.5, int n_cycles=10000, int length_cycle = 50, int n_warmup_cycles = 5000, std::string random_name = "",
+  void solve(double U, double delta, double delta0=.5, int k=-1, int n_cycles=10000, int length_cycle = 50, int n_warmup_cycles = 5000, std::string random_name = "",
               int max_time = -1, int seed=34788);
 
   };
@@ -87,7 +94,7 @@ struct g0bar_tau {
   class solver2 {
 
   double beta;
-  triqs::gfs::block_gf<imfreq> g0_iw, g0tilde_iw, g_iw, M_iw; //M_iw is the interacting Green's function kernel
+  triqs::gfs::block_gf<imfreq> g0_iw, g0tilde_iw, g_iw, m_iw, mk_iw; //M_iw is the interacting Green's function kernel
   triqs::gfs::block_gf<imtime> g0tilde_tau;
   std::vector<double> hist;
   std::vector<dcomplex> hist_sign;
@@ -95,6 +102,7 @@ struct g0bar_tau {
   std::vector<dcomplex> hist_n;
   dcomplex d;
   std::vector<dcomplex> hist_d;
+  //std::vector<dcomplex> hist_m;
 
   public:
   /// Access non-interacting Matsubara Green function
@@ -115,19 +123,22 @@ struct g0bar_tau {
   std::vector<dcomplex> Hist_n() { return hist_n; };
 
   /// Access double occupancy
-  //dcomplex D0() {return d0;};
-
-  /// Access double occupancy
   dcomplex D() {return d;};
 
   /// Access double occupancy histogram
   std::vector<dcomplex> Hist_d() { return hist_d; };
 
+  triqs::gfs::block_gf_view<imfreq> M_iw() { return m_iw; }
+
+  triqs::gfs::block_gf_view<imfreq> Mk_iw() { return mk_iw; }
+
+  //std::vector<dcomplex> Hist_m() { return hist_m; };
+
   /// Construct a ctint solver
   solver2(double beta_, int n_iw = 1024, int n_tau = 100001);
 
   /// Method that performs the QMC calculation
-  void solve(double U, double delta, double delta0=.5, int n_cycles=10000, int length_cycle = 50, int n_warmup_cycles = 5000, std::string random_name = "",
+  void solve(double U, double delta, double delta0=.5, int k=-1, int n_cycles=10000, int length_cycle = 50, int n_warmup_cycles = 5000, std::string random_name = "",
               int max_time = -1, int seed=34788);
   };
   

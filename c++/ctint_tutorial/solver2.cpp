@@ -8,8 +8,9 @@ using namespace ctint_tutorial;
 
 // The Monte Carlo configuration
 struct configuration2 {
-  // M-matrices for up and down
+  // M-matrices for up and down up to even order
   std::vector<triqs::det_manip::det_manip<g0bar_tau>> Mmatrices_even;
+  // M-matrices for up and down up to odd order
   std::vector<triqs::det_manip::det_manip<g0bar_tau>> Mmatrices_odd;
   dcomplex det_ratio;
   dcomplex d0;
@@ -446,7 +447,7 @@ struct measure_histogram_n2 {
 
   /// Reduce and normalize
   void collect_results(mpi::communicator const &comm) {
-    std::cout << "collecting  ";
+    //std::cout << "collecting  ";
   
     // Make sure that all mpi threads have an equally sized histogram
     auto max_k_vec         = std::vector<size_t>(comm.size());
@@ -556,7 +557,7 @@ struct measure_histogram_d2 {
 
   /// Reduce and normalize
   void collect_results(mpi::communicator const &comm) {
-    std::cout << "collecting  ";
+    //std::cout << "collecting  ";
   
     // Make sure that all mpi threads have an equally sized histogram
     auto max_k_vec         = std::vector<size_t>(comm.size());
@@ -580,7 +581,7 @@ struct measure_M2 {
   double U;
   dcomplex Z;
   long count;
-  block_gf<imfreq> &Kw;  // reference to M-matrix
+  block_gf<imfreq> Kw;  // reference to M-matrix
 
 
   measure_M2(configuration2 *config_, block_gf<imfreq> &Mw_, double beta_, double U_) : config(config_), Mw(Mw_), beta(beta_), U(U_), count(0), Kw{Mw_} { Mw() = 0; Z=0; count=0;}
@@ -595,24 +596,24 @@ struct measure_M2 {
     for (auto spin : {up, down}) {
 
       // A lambda to measure the M-matrix in frequency
-      auto lambda_even = [this, spin, sign, k](arg_t const &x, arg_t const &y, dcomplex M) {
+      auto lambda_even = [this, spin, k](arg_t const &x, arg_t const &y, dcomplex M) {
         auto const &mesh = this->Mw[spin].mesh();
-        auto phase_step  = -2.0i * M_PI * (x.tau - y.tau) / beta;
-        auto coeff       = std::exp((mesh.first_index() + 1) * phase_step);
-        auto fact        = std::exp(phase_step);
+        auto phase_step  = -1.0i * M_PI * (x.tau - y.tau) / beta;
+        auto coeff       = std::exp((2 * mesh.first_index() + 1) * phase_step);
+        auto fact        = std::exp(2 * phase_step);
         for (auto const &om : mesh) {
-          this->Kw[spin][om](0, 0) += sign * M * coeff * k * config->det_ratio / (this->beta * this->U);
+          this->Kw[spin][om] += M * coeff * k * config->det_ratio / (this->beta * this->U);
           coeff *= fact;
         }
       };
 
-      auto lambda_odd = [this, spin, sign](arg_t const &x, arg_t const &y, dcomplex M) {
+      auto lambda_odd = [this, spin](arg_t const &x, arg_t const &y, dcomplex M) {
         auto const &mesh = this->Mw[spin].mesh();
-        auto phase_step  = -2.0i * M_PI * (x.tau - y.tau) / beta;
-        auto coeff       = std::exp(( mesh.first_index() + 1) * phase_step);
-        auto fact        = std::exp(phase_step);
+        auto phase_step  = -1.0i * M_PI * (x.tau - y.tau) / beta;
+        auto coeff       = std::exp((2 * mesh.first_index() + 1) * phase_step);
+        auto fact        = std::exp(2 * phase_step);
         for (auto const &om : mesh) {
-          this->Kw[spin][om](0, 0) -=  sign * M * coeff;
+          this->Kw[spin][om] -= M * coeff;
           coeff *= fact;
         }
       };
@@ -621,7 +622,7 @@ struct measure_M2 {
 
       foreach (config->Mmatrices_odd[spin], lambda_odd);
       
-      Kw[spin] /= (k * config->det_ratio / (beta * U) - 1);
+      Kw[spin] *= sign/(k * config->det_ratio / (beta * U) - 1);
 
       Mw[spin] += Kw[spin];
     }
@@ -637,6 +638,138 @@ struct measure_M2 {
   }
 };
 
+struct measure_Mk2 {
+
+  configuration2 *config; // Pointer to the MC configuration
+  block_gf<imfreq> &Mkw;  // reference to M-matrix
+  int k;
+  double beta;
+  double U;
+  dcomplex Z;
+  long count;
+  block_gf<imfreq> Kw;  // reference to M-matrix
+
+
+  measure_Mk2(configuration2 *config_, block_gf<imfreq> &Mkw_, int k_, double beta_, double U_) : config(config_), Mkw(Mkw_), k(k_), beta(beta_), U(U_), Kw{Mkw_} {
+     Mkw() = 0; Z=0; count=0;
+     }
+
+  void accumulate(dcomplex sign) {
+    Z += sign;
+    count++;
+    if (k==config->perturbation_order()) {
+      config->set_det_ratio();
+      Kw()=0;
+
+      for (auto spin : {up, down}) {
+
+        // A lambda to measure the M-matrix in frequency
+        auto lambda_even = [this, spin, sign](arg_t const &x, arg_t const &y, dcomplex M) {
+          auto const &mesh = this->Mkw[spin].mesh();
+          auto phase_step  = -1.0i * M_PI * (x.tau - y.tau) / beta;
+          auto coeff       = std::exp((2 * mesh.first_index() + 1) * phase_step);
+          auto fact        = std::exp(2 * phase_step);
+          for (auto const &om : mesh) {
+            //std::cout << om;
+            this->Kw[spin][om] += M * coeff * this->k * config->det_ratio / (this->beta * this->U);
+            coeff *= fact;
+          }
+        };
+
+        auto lambda_odd = [this, spin, sign](arg_t const &x, arg_t const &y, dcomplex M) {
+          auto const &mesh = this->Mkw[spin].mesh();
+          auto phase_step  = -1.0i * M_PI * (x.tau - y.tau) / beta;
+          auto coeff       = std::exp((2 * mesh.first_index() + 1) * phase_step);
+          auto fact        = std::exp(2 * phase_step);
+          for (auto const &om : mesh) {
+            this->Kw[spin][om] -= M * coeff;
+            coeff *= fact;
+          }
+        };
+
+        foreach (config->Mmatrices_even[spin], lambda_even);
+
+        foreach (config->Mmatrices_odd[spin], lambda_odd);
+        
+        Kw[spin] *= sign/(k * config->det_ratio / (beta * U) - 1);
+
+        Mkw[spin] += Kw[spin];
+      }
+    }
+  }
+
+  void collect_results(mpi::communicator const &c) {
+    Mkw = mpi::all_reduce(Mkw, c);
+    Z  = mpi::all_reduce(Z, c);
+    Mkw = Mkw / (-Z * beta);
+
+    // Print the sign
+    if (c.rank() == 0) std::cerr << "Average sign " << Z / c.size() / count << std::endl;
+  }
+};
+/*
+struct measure_M_wn {
+
+  configuration2 const *config; // Pointer to the MC configuration
+  std::vector<dcomplex> &histogram_m;
+  int n;
+  double beta,U;
+  dcomplex Z;
+  long count;
+
+  measure_M_wn(configuration2 const *config_, std::vector<dcomplex> &histogram_m_, int n_, double beta_, double U_) : config(config_), histogram_m(histogram_m_), n(n_), beta(beta_), U(U_) {
+    histogram_m = std::vector<dcomplex>(2); Z=0; count=0;
+    }
+
+  void accumulate(dcomplex sign) {
+    Z += sign;
+    count++;
+    int k = config->perturbation_order();
+    while (k >= histogram_m.size()) histogram_m.resize(2 * histogram_m.size());
+
+    config->set_det_ratio();
+    dcomplex K = 0;
+
+    for (auto spin : {up, down}) {
+
+      // A lambda to measure the M-matrix in frequency
+      auto lambda_even = [this, spin, k, K](arg_t const &x, arg_t const &y, dcomplex M) {
+        auto phase_step  = -1.0i * M_PI * (x.tau - y.tau) / beta;
+        auto coeff       = std::exp((2 * this->n + 1) * phase_step);
+        K += M * coeff * k * config->det_ratio / (this->beta * this->U);
+      };
+
+      auto lambda_odd = [this, spin, K](arg_t const &x, arg_t const &y, dcomplex M) {
+        auto phase_step  = -1.0i * M_PI * (x.tau - y.tau) / beta;
+        auto coeff       = std::exp((2 * this->n + 1) * phase_step);
+        K -= M * coeff;
+      };
+
+      foreach (config->Mmatrices_even[spin], lambda_even);
+
+      foreach (config->Mmatrices_odd[spin], lambda_odd);
+      
+      K *= sign/(k * config->det_ratio / (beta * U) - 1);
+
+      histogram_m[k] += K;
+    }
+  }
+
+  void collect_results(mpi::communicator const &comm) {
+    // Make sure that all mpi threads have an equally sized histogram
+    auto max_k_vec         = std::vector<size_t>(comm.size());
+    max_k_vec[comm.rank()] = histogram_m.size();
+    max_k_vec              = mpi::all_reduce(max_k_vec, comm);
+    histogram_m.resize(*std::max_element(max_k_vec.begin(), max_k_vec.end()));
+
+    // Reduce histogram over all mpi threads
+    histogram_m = mpi::all_reduce(histogram_m, comm);
+    Z  = mpi::all_reduce(Z, comm);
+
+    for (auto &h_k : histogram_m) h_k = h_k / (-Z * beta);
+  }
+};
+*/
 // ------------ The main class of the solver ------------------------
 
 solver2::solver2(double beta_, int n_iw, int n_tau)
@@ -644,19 +777,22 @@ solver2::solver2(double beta_, int n_iw, int n_tau)
      g0_iw{make_block_gf({"up", "down"}, gf<imfreq>{{beta, Fermion, n_iw}, {1, 1}})},
      g0tilde_iw{g0_iw},
      g_iw{g0_iw},
-     M_iw{g0_iw},
+     m_iw{g0_iw},
+     mk_iw{g0_iw},
      g0tilde_tau{make_block_gf({"up", "down"}, gf<imtime>{{beta, Fermion, n_tau}, {1, 1}})}, 
      hist{std::vector<double>(2)},
      hist_sign{std::vector<dcomplex>(2)},
      n{std::vector<dcomplex>(2)},
      hist_n{std::vector<dcomplex>(2)},
      d{0},
-     hist_d{std::vector<dcomplex>(2)}{
+     hist_d{std::vector<dcomplex>(2)}
+     //hist_m{std::vector<dcomplex>(2)}
+     {
       std::cout << "--------- /!\\ Using Solver2 /!\\ ---------\n";
      }
 
 // The method that runs the qmc
-void solver2::solve(double U, double delta, double delta0, int n_cycles, int length_cycle, int n_warmup_cycles, std::string random_name, int max_time, int seed) {
+void solver2::solve(double U, double delta, double delta0, int k, int n_cycles, int length_cycle, int n_warmup_cycles, std::string random_name, int max_time, int seed) {
   std::cout << "--------- /!\\ Using Solver2 /!\\ ---------\n";
 
   mpi::communicator world;
@@ -688,14 +824,16 @@ void solver2::solve(double U, double delta, double delta0, int n_cycles, int len
   CTQMC.add_measure(measure_histogram_n2{&config, hist_n, beta, U}, "density histogram measurement");
   CTQMC.add_measure(measure_d2{&config, d, beta, U}, "double occupancy measurement");
   CTQMC.add_measure(measure_histogram_d2{&config, hist_d, beta, U}, "double occupancy histogram measurement");
-  //CTQMC.add_measure(measure_M2{&config, M_iw, beta, U}, "M measurement");
+  CTQMC.add_measure(measure_M2{&config, m_iw, beta, U}, "M measurement");
+  if (k>0)
+    CTQMC.add_measure(measure_Mk2{&config, mk_iw, k, beta, U}, "M kth order measurement");
 
   // Run and collect results
   CTQMC.warmup_and_accumulate(n_warmup_cycles, n_cycles, length_cycle, triqs::utility::clock_callback(max_time));
   CTQMC.collect_results(world);
 
   // Compute the Green function from Mw
-  g_iw[spin_](om_) << g0tilde_iw[spin_](om_) + g0tilde_iw[spin_](om_) * M_iw[spin_](om_) * g0tilde_iw[spin_](om_);
+  g_iw[spin_](om_) << g0tilde_iw[spin_](om_) + g0tilde_iw[spin_](om_) * m_iw[spin_](om_) * g0tilde_iw[spin_](om_);
 
   // Set the tail of g_iw to 1/w
   triqs::arrays::array<dcomplex, 3> mom{{{0}}, {{1}}}; // 0 + 1/omega

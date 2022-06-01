@@ -8,9 +8,9 @@ from numpy.random import rand,randint
 from ctint_tutorial import Solver, Solver2
 
 # Parameters
-beta = 1.5             # Inverse temperature
-U = 2.5                # Hubbard interaction
-mu = U/2            # Chemical potential
+#beta = 2             # Inverse temperature
+#U = 3                # Hubbard interaction
+#mu = U/2            # Chemical potential
 half_bandwidth=1.0   # Half bandwidth (energy unit)
 n_iw = 128           # Number of Matsubara frequencies
 n_cycles = 10000     # Number of MC cycles
@@ -20,15 +20,21 @@ n_warmup_cycles = 5000
 N = 10               # Number of solver samples
 r = randint(0,100000,size=N)
 
-nid = 2
+nid = 1
 id0 = 8
-deltas = [0.,.01]
-delta0s = [0,.5]
-for id in range(id0,id0+nid):
-   delta = deltas[id-id0]
-   delta0 = delta0s[id-id0]
+#deltas = [0.,.01]
+#delta0s = [0,.5]
+delta = .1 #deltas[id-id0] #rand() #deltas[id-id0]
+delta0 = .5 #delta0s[id-id0] #rand() #delta0s[id-id0]
 
-   print(f"id: {id+1} of {nid}")
+for id in range(id0,id0+nid):
+   delta = .1 #deltas[id-id0] #rand() #deltas[id-id0]
+   delta0 = .3 #delta0s[id-id0] #rand() #delta0s[id-id0]
+   beta = 5 #(id+1)*.6
+   U = 6
+   mu = U/2            # Chemical potential
+
+   print(f"id: {id-id0+1} of {nid}")
    print(f"beta = {beta}")
    print(f"U = {U}")
    print(f"delta = {delta}")
@@ -40,13 +46,14 @@ for id in range(id0,id0+nid):
          S = Solver(beta, n_iw) # Initialize the solver
          
          for k in range(N):
+            k0 = (2*k+1)%8
 
             S.G_iw << SemiCircular(half_bandwidth) # Initialize the Green's function
 
             for name, G0 in S.G0_iw:
                G0 << inverse(iOmega_n + mu - (half_bandwidth/2.0)**2 * S.G_iw[name] ) # Set G0
             print(f"solve # {k+1} of {N}")
-            S.solve(U, delta, delta0, n_cycles, length_cycles, n_warmup_cycles, seed=r[k])
+            S.solve(U, delta, delta0, k0, n_cycles, length_cycles, n_warmup_cycles, seed=r[k])
 
             G_sym = (S.G_iw['up']+S.G_iw['down'])/2 # Impose paramagnetic solution
 
@@ -62,8 +69,11 @@ for id in range(id0,id0+nid):
                A[f'hist_n_{k}'] = S.Hist_n
                A[f'd_{k}'] = S.D
                A[f'hist_d_{k}'] = S.Hist_d
-               #A[f'G0_iw_{k}'] = S.G0_iw
-               #A[f'G_iw_{k}'] = G_sym 
+               A[f'G0_iw_{k}'] = S.G0_iw
+               A[f'G_iw_{k}'] = G_sym 
+               A[f'M_iw_{k}'] = S.M_iw 
+               A[f'k_{k}'] = k0 
+               A[f'Mk_iw_{k}'] = S.Mk_iw 
 
 
    if True:
@@ -72,12 +82,14 @@ for id in range(id0,id0+nid):
          S = Solver2(beta, n_iw) # Initialize the solver
 
          for k in range(N):
+            k0 = (2*k+1)%6
+
             S.G_iw << SemiCircular(half_bandwidth) # Initialize the Green's function
 
             for name, G0 in S.G0_iw:
                G0 << inverse(iOmega_n + mu - (half_bandwidth/2.0)**2 * S.G_iw[name] ) # Set G0
             print(f"solve # {k+1} of {N}")
-            S.solve(U, delta, delta0, n_cycles,length_cycles, n_warmup_cycles, seed=r[k]) # Solve the impurity problem
+            S.solve(U, delta, delta0, k0, n_cycles,length_cycles, n_warmup_cycles, seed=r[k]) # Solve the impurity problem
 
             G_sym = (S.G_iw['up']+S.G_iw['down'])/2 # Impose paramagnetic solution
 
@@ -93,5 +105,8 @@ for id in range(id0,id0+nid):
                A[f'hist_n_{k}'] = S.Hist_n
                A[f'd_{k}'] = S.D
                A[f'hist_d_{k}'] = S.Hist_d
-               #A[f'G0_iw_{k}'] = S.G0_iw
-               #A[f'G_iw_{k}'] = G_sym 
+               A[f'G0_iw_{k}'] = S.G0_iw
+               A[f'G_iw_{k}'] = G_sym 
+               A[f'M_iw_{k}'] = S.M_iw
+               A[f'k_{k}'] = k0 
+               A[f'Mk_iw_{k}'] = S.Mk_iw

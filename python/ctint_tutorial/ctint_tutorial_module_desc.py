@@ -31,7 +31,7 @@ c = class_(
 
 c.add_constructor("""(double beta_, int n_iw = 1024, int n_tau = 100001)""", doc = r"""Construct a ctint solver""")
 
-c.add_method("""void solve (double U, double delta, double delta0, int n_cycles, int length_cycle = 50, int n_warmup_cycles = 5000, std::string random_name = \"\", int max_time = -1, int seed = 34788)""",
+c.add_method("""void solve (double U, double delta, double delta0, int k=-1, int n_cycles=10000, int length_cycle = 50, int n_warmup_cycles = 5000, std::string random_name = \"\", int max_time = -1, int seed = 34788)""",
              doc = r"""Method that performs the QMC calculation""")
 
 c.add_property(name = "G0_iw",
@@ -69,7 +69,14 @@ c.add_property(name = "D",
 c.add_property(name = "Hist_d",
                getter = cfunction("std::vector<dcomplex> Hist_d ()"),
                doc = r"""Access order double occupancy histogram""")
-               
+
+c.add_property(name = "M_iw",
+               getter = cfunction("block_gf_view<triqs::gfs::imfreq> M_iw ()"),
+               doc = r"""Access interacting Matsubara Green function""")
+
+c.add_property(name = "Mk_iw",
+               getter = cfunction("block_gf_view<triqs::gfs::imfreq> Mk_iw ()"),
+               doc = r"""Access interacting Matsubara Green function""")              
 module.add_class(c)
 
 # The class solver2
@@ -82,7 +89,7 @@ c2 = class_(
 
 c2.add_constructor("""(double beta_, int n_iw = 1024, int n_tau = 100001)""", doc = r"""Construct a ctint solver""")
 
-c2.add_method("""void solve (double U, double delta, double delta0, int n_cycles, int length_cycle = 50, int n_warmup_cycles = 5000, std::string random_name = \"\", int max_time = -1, int seed = 34788)""",
+c2.add_method("""void solve (double U, double delta, double delta0, int k=-1, int n_cycles=10000, int length_cycle = 50, int n_warmup_cycles = 5000, std::string random_name = \"\", int max_time = -1, int seed = 34788)""",
              doc = r"""Method that performs the QMC calculation""")
 
 c2.add_property(name = "G0_iw",
@@ -120,6 +127,14 @@ c2.add_property(name = "D",
 c2.add_property(name = "Hist_d",
                getter = cfunction("std::vector<dcomplex> Hist_d ()"),
                doc = r"""Access order double occupancy histogram""")
+
+c2.add_property(name = "M_iw",
+               getter = cfunction("block_gf_view<triqs::gfs::imfreq> M_iw ()"),
+               doc = r"""Access interacting Matsubara Green function""")
+
+c2.add_property(name = "Mk_iw",
+               getter = cfunction("block_gf_view<triqs::gfs::imfreq> Mk_iw ()"),
+               doc = r"""Access interacting Matsubara Green function""")
 
 module.add_class(c2)
 
