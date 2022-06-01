@@ -2,6 +2,7 @@ from triqs.gf import *
 from h5 import *
 from triqs.plot.mpl_interface import oplot
 import triqs.utility.mpi as mpi
+from numpy import array
 from numpy.random import rand,randint
 #from numpy import ones
 from time import time
@@ -20,12 +21,12 @@ N = 10               # Number of solver samples
 r = randint(0,100000,size=N)
 
 nid = 5
-id0 = 15
+id0 = 20
 
 
 for id in range(id0,id0+nid):
-   beta = (id-id0+1)/nid*17              # Inverse temperature
-   U = 17/beta                # Hubbard interaction
+   beta = (id-id0+1)/nid*6              # Inverse temperature
+   U = 4                # Hubbard interaction
    mu = U/2            # Chemical potential
 
    print(f"id: {id-id0+1} of {nid}")
@@ -151,15 +152,15 @@ for id in range(id0,id0+nid):
             A[f'U'] = U
             A[f'delta'] = delta
             A[f'delta0'] = delta0
-            A[f'hist'] = hist
-            A[f'hist_sign'] = hist_sign
-            A[f'n'] = n
-            A[f'hist_n'] = hist_n
-            A[f'd'] = d
-            A[f'hist_d'] = hist_d
-            A[f'G0_iw'] = G0_iw
-            A[f'G_iw'] = G_iw 
-            A[f'M_iw'] = M_iw 
-            A[f'k'] = pert_k 
-            A[f'Mk_iw'] = Mk_iw
-            A[f't'] = t
+            A[f'hist'] = array(hist)
+            A[f'hist_sign'] = array(hist_sign)
+            A[f'n'] = array(n)
+            A[f'hist_n'] = array(hist_n)
+            A[f'd'] = array(d)
+            A[f'hist_d'] = array(hist_d)
+            A[f'G0_iw'] = array(G0_iw)
+            A[f'G_iw'] = array(G_iw)
+            A[f'M_iw'] = array(M_iw) 
+            A[f'k'] = array(pert_k)
+            A[f'Mk_iw'] = array(Mk_iw)
+            A[f't'] = array(t)
