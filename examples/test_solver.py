@@ -1,10 +1,8 @@
-from triqs.gf import *
-from h5 import *
-from triqs.plot.mpl_interface import oplot
-import triqs.utility.mpi as mpi
+from triqs.gf import SemiCircular, inverse, iOmega_n
+from h5 import HDFArchive
+from triqs.utility.mpi import is_master_node
 from numpy import array,zeros
-from numpy.random import rand,randint
-#from numpy import ones
+from numpy.random import randint#, rand
 from time import time
 from ctint_tutorial import Solver, Solver2
 
@@ -31,13 +29,13 @@ n_warmup_cycles = 5000
 N = 10               # Number of solver samples
 r = randint(0,100000,size=N)
 
-nid = 5
-id0 = 29
+nid = 1
+id0 = 0
 
 for id in range(id0,id0+nid):
    print(f"id: {id-id0+1} of {nid}")
 
-   if id==id0:
+   if False:
       with HDFArchive(f"data/{id}test_solver.h5",'w') as A:
 
          S = Solver(beta, n_iw) # Initialize the solver
@@ -55,6 +53,7 @@ for id in range(id0,id0+nid):
          pert_k = []
          Mk_iw = []
          t = []
+         warn = 0
 
          for k in range(N):
             k0 = (2*k+1)%8
@@ -85,8 +84,10 @@ for id in range(id0,id0+nid):
                t.append(dt)
             except RuntimeError:
                pass
+            except Warning:
+               warn += 1
 
-         if mpi.is_master_node():
+         if is_master_node():
             A['N'] = Ns
             A[f'beta'] = beta
             A[f'U'] = U
@@ -106,7 +107,7 @@ for id in range(id0,id0+nid):
             A[f't'] = array(t)
 
    if True:
-      n_cycles = int(n_cycles0*(.1+(id-id0)/nid/10))
+      n_cycles = n_cycles0
       with HDFArchive(f"data/{id}test_solver2.h5",'w') as A:
 
          S = Solver2(beta, n_iw) # Initialize the solver
@@ -158,7 +159,7 @@ for id in range(id0,id0+nid):
                pass
 
          
-         if mpi.is_master_node():
+         if is_master_node():
             A['N'] = Ns
             A[f'beta'] = beta
             A[f'U'] = U
