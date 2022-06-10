@@ -1,0 +1,1 @@
+0-4: varying $\beta$ at fixed non half doping

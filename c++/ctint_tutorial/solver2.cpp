@@ -67,7 +67,7 @@ struct configuration2 {
     std::cout << "\n";
   }
 
-  configuration2(block_gf<imtime> &g0tilde_tau, double beta, double delta, double delta0) {
+  configuration2(block_gf<imtime> &g0tilde_tau, double beta, double delta, double delta0, int nobc) {
     //std::cout << "--------- /!\\ Initializing double config ";
     // Initialize the M-matrices. 100 is the initial matrix size
     det_ratio = 1;
@@ -81,10 +81,9 @@ struct configuration2 {
       Mmatrices_even.emplace_back(g[spin], 100);
       Mmatrices_odd.emplace_back(g[spin], 100);
       det_ratio /= Mmatrices_odd[spin].insert_at_end({tau,s},{tau,s});
-      //Mmatrices_even[spin].set_n_operations_before_check(50);
-      //Mmatrices_odd[spin].set_n_operations_before_check(50);
-      //Mmatrices_even[spin].set_n_operations_before_check(1000000000);
-      //Mmatrices_odd[spin].set_n_operations_before_check(1000000000);
+      Mmatrices_even[spin].set_n_operations_before_check(nobc);
+      Mmatrices_odd[spin].set_n_operations_before_check(nobc);
+      //std::cout << "nobc: " << Mmatrices_even[spin].get_n_operations_before_check() << " " << Mmatrices_odd[spin].get_n_operations_before_check() << '\n';
     }
 
     //print_taus();
@@ -294,7 +293,11 @@ struct measure_histogram2 {
   long N;
 
   measure_histogram2(configuration2 const *config_, std::vector<double> &histogram_)
-      : config(config_), histogram(histogram_) {histogram = std::vector<double>(2); N=0;}
+      : config(config_), histogram(histogram_) {
+        histogram = std::vector<double>(2);
+        for (auto &h_k : histogram) h_k = 0;
+        N=0;
+      }
 
   /// Accumulate perturbation order into histogram
   void accumulate(dcomplex sign) {
@@ -333,7 +336,8 @@ struct measure_histogram_sign2 {
   measure_histogram_sign2(configuration2 const *config_, std::vector<dcomplex> &histogram_sign_, double beta_, double U_)
       : config(config_), histogram_sign(histogram_sign_), beta(beta_), U(U_) {
         histogram_sign = std::vector<dcomplex>(2);
-        for (auto &h_k : histogram_sign) h_k=0;}
+        for (auto &h_k : histogram_sign) h_k=0;
+      }
 
   /// Accumulate perturbation order into histogram
   void accumulate(dcomplex sign) {
@@ -415,7 +419,10 @@ struct measure_histogram_n2 {
 
 
   measure_histogram_n2(configuration2 *config_, std::vector<dcomplex> &histogram_n_, double beta_, double U_)
-      : config(config_), histogram_n(histogram_n_), beta(beta_), U(U_) {histogram_n = std::vector<dcomplex>(2); Z=0;}
+      : config(config_), histogram_n(histogram_n_), beta(beta_), U(U_) {
+        histogram_n = std::vector<dcomplex>(2);
+        for (auto &h_k : histogram_n) h_k = 0;
+        Z=0;}
 
   /// Accumulate perturbation order into histogram
   void accumulate(dcomplex sign) {
@@ -523,7 +530,10 @@ struct measure_histogram_d2 {
 
 
   measure_histogram_d2(configuration2 *config_, std::vector<dcomplex> &histogram_d_, double beta_, double U_)
-      : config(config_), histogram_d(histogram_d_), beta(beta_), U(U_) {histogram_d = std::vector<dcomplex>(2); Z=0;}
+      : config(config_), histogram_d(histogram_d_), beta(beta_), U(U_) {
+        histogram_d = std::vector<dcomplex>(2);
+        for (auto &h_k : histogram_d) h_k = 0;
+        Z=0;}
 
   /// Accumulate perturbation order into histogram
   void accumulate(dcomplex sign) {
@@ -792,7 +802,7 @@ solver2::solver2(double beta_, int n_iw, int n_tau)
      }
 
 // The method that runs the qmc
-void solver2::solve(double U, double delta, double delta0, int k, int n_cycles, int length_cycle, int n_warmup_cycles, std::string random_name, int max_time, int seed) {
+void solver2::solve(double U, double delta, double delta0, int k, int nobc, int n_cycles, int length_cycle, int n_warmup_cycles, std::string random_name, int max_time, int seed) {
   std::cout << "--------- /!\\ Using Solver2 /!\\ ---------\n";
 
   mpi::communicator world;
@@ -813,7 +823,7 @@ void solver2::solve(double U, double delta, double delta0, int k, int n_cycles, 
   triqs::mc_tools::mc_generic<dcomplex> CTQMC(random_name, random_seed, verbosity);
 
   // Prepare the configuration
-  auto config = configuration2{g0tilde_tau, beta, delta, delta0};
+  auto config = configuration2{g0tilde_tau, beta, delta, delta0, nobc};
 
   // Register moves and measurements
   CTQMC.add_move(move_insert2{&config, CTQMC.get_rng(), beta, U,0,0}, "insertion");
@@ -831,6 +841,12 @@ void solver2::solve(double U, double delta, double delta0, int k, int n_cycles, 
   // Run and collect results
   CTQMC.warmup_and_accumulate(n_warmup_cycles, n_cycles, length_cycle, triqs::utility::clock_callback(max_time));
   CTQMC.collect_results(world);
+
+  for(auto &n_s : n) {
+    n_s += delta0;
+    d += delta0 * n_s;
+  }
+  d -= delta0 * delta0 - delta * delta;
 
   // Compute the Green function from Mw
   g_iw[spin_](om_) << g0tilde_iw[spin_](om_) + g0tilde_iw[spin_](om_) * m_iw[spin_](om_) * g0tilde_iw[spin_](om_);

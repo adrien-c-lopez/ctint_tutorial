@@ -15,28 +15,28 @@ def pad(u):
    return res
 
 # Parameters
-beta = 15.            # Inverse temperature
+beta = 6.            # Inverse temperature
 U = 4.                # Hubbard interaction
-mu = U/2              # Chemical potential
 delta = .1
-delta0 = .5
 half_bandwidth=1.0   # Half bandwidth (energy unit)
 n_iw = 128           # Number of Matsubara frequencies
-n_cycles0 = 10000     # Number of MC cycles
-length_cycles = 50   # Number of MC cycles
+n_cycles = 20000     # Number of MC cycles
+length_cycle = 50   # Number of MC cycles
 n_warmup_cycles = 5000
 
-N = 10               # Number of solver samples
+N = 5               # Number of solver samples
 r = randint(0,100000,size=N)
 
-nid = 1
-id0 = 0
-
+nid = 10
+id0 = 15
+folder = "chemical potential data"
 for id in range(id0,id0+nid):
    print(f"id: {id-id0+1} of {nid}")
+   mu = U/2+(id-id0+1)/nid*5
+   delta0 = .5+(id-id0+1)/nid*.35
 
-   if False:
-      with HDFArchive(f"data/{id}test_solver.h5",'w') as A:
+   if True:
+      with HDFArchive(f"{folder}/{id}solver.h5",'w') as A:
 
          S = Solver(beta, n_iw) # Initialize the solver
 
@@ -53,7 +53,6 @@ for id in range(id0,id0+nid):
          pert_k = []
          Mk_iw = []
          t = []
-         warn = 0
 
          for k in range(N):
             k0 = (2*k+1)%8
@@ -65,7 +64,7 @@ for id in range(id0,id0+nid):
             print(f"solve # {k+1} of {N}")
             t0 = time()
             try:
-               S.solve(U, delta, delta0, k0, n_cycles0, length_cycles, n_warmup_cycles, seed=r[k])
+               S.solve(U, delta, delta0, k0, n_cycles=n_cycles, length_cycle=length_cycle, n_warmup_cycles=n_warmup_cycles, seed=r[k])
                dt = time()-t0
                G_sym = (S.G_iw['up']+S.G_iw['down'])/2 # Impose paramagnetic solution
 
@@ -84,13 +83,12 @@ for id in range(id0,id0+nid):
                t.append(dt)
             except RuntimeError:
                pass
-            except Warning:
-               warn += 1
 
          if is_master_node():
             A['N'] = Ns
             A[f'beta'] = beta
             A[f'U'] = U
+            A[f'mu'] = mu
             A[f'delta'] = delta
             A[f'delta0'] = delta0
             A[f'hist'] = pad(hist)
@@ -105,10 +103,14 @@ for id in range(id0,id0+nid):
             A[f'k'] = array(pert_k)
             A[f'Mk_iw'] = (Mk_iw)
             A[f't'] = array(t)
+            A[f'n_cycles'] = n_cycles
+            A[f'n_warmup_cylces'] = n_warmup_cycles
 
    if True:
-      n_cycles = n_cycles0
-      with HDFArchive(f"data/{id}test_solver2.h5",'w') as A:
+      n_cycles2 = n_cycles//5
+      n_warmup_cycles2 = n_warmup_cycles//10
+
+      with HDFArchive(f"{folder}/{id}solver2.h5",'w') as A:
 
          S = Solver2(beta, n_iw) # Initialize the solver
          
@@ -137,7 +139,7 @@ for id in range(id0,id0+nid):
             print(f"solve # {k+1} of {N}")
             t0 = time()
             try:
-               S.solve(U, delta, delta0, k0, n_cycles,length_cycles, n_warmup_cycles, seed=r[k]) # Solve the impurity problem
+               S.solve(U, delta, delta0, k0, n_cycles=n_cycles2,length_cycle=length_cycle, n_warmup_cycles=n_warmup_cycles2, seed=r[k]) # Solve the impurity problem
                dt = time()-t0
                G_sym = (S.G_iw['up']+S.G_iw['down'])/2 # Impose paramagnetic solution
 
@@ -157,12 +159,12 @@ for id in range(id0,id0+nid):
                n_meas.append(n_cycles)
             except RuntimeError:
                pass
-
          
          if is_master_node():
             A['N'] = Ns
             A[f'beta'] = beta
             A[f'U'] = U
+            A[f'mu'] = mu
             A[f'delta'] = delta
             A[f'delta0'] = delta0
             A[f'hist'] = pad(hist)
@@ -177,4 +179,5 @@ for id in range(id0,id0+nid):
             A[f'k'] = array(pert_k)
             A[f'Mk_iw'] = (Mk_iw)
             A[f't'] = array(t)
-            A[f'n_cycles'] = n_cycles
+            A[f'n_cycles'] = n_cycles2
+            A[f'n_warmup_cylces'] = n_warmup_cycles2

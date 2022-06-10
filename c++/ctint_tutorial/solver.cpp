@@ -514,6 +514,12 @@ void solver::solve(double U, double delta, double delta0, int k, int n_cycles, i
   CTQMC.warmup_and_accumulate(n_warmup_cycles, n_cycles, length_cycle, triqs::utility::clock_callback(max_time));
   CTQMC.collect_results(world);
 
+  for(auto &n_s : n) {
+    n_s += delta0;
+    d += delta0 * n_s;
+  }
+  d -= delta0 * delta0 - delta * delta;
+
   // Compute the Green function from Mw
   g_iw[spin_](om_) << g0tilde_iw[spin_](om_) + g0tilde_iw[spin_](om_) * m_iw[spin_](om_) * g0tilde_iw[spin_](om_);
 
