@@ -798,12 +798,12 @@ solver2::solver2(double beta_, int n_iw, int n_tau)
      hist_d{std::vector<dcomplex>(2)}
      //hist_m{std::vector<dcomplex>(2)}
      {
-      std::cout << "--------- /!\\ Using Solver2 /!\\ ---------\n";
+      std::cout << "--------- CTINT2-TUTORIAL ---------\n";
      }
 
 // The method that runs the qmc
 void solver2::solve(double U, double delta, double delta0, int k, int nobc, int n_cycles, int length_cycle, int n_warmup_cycles, std::string random_name, int max_time, int seed) {
-  std::cout << "--------- /!\\ Using Solver2 /!\\ ---------\n";
+  std::cout << "--------- CTINT2-TUTORIAL ---------\n";
 
   mpi::communicator world;
   triqs::clef::placeholder<0> spin_;
@@ -830,13 +830,13 @@ void solver2::solve(double U, double delta, double delta0, int k, int nobc, int 
   CTQMC.add_move(move_remove2{&config, CTQMC.get_rng(), beta, U,0,0}, "removal");
   CTQMC.add_measure(measure_histogram2{&config, hist}, "histogram measurement");
   CTQMC.add_measure(measure_histogram_sign2{&config, hist_sign, beta, U}, "sign histogram measurement");
-  CTQMC.add_measure(measure_n2{&config, n, beta, U}, "density measurement");
-  CTQMC.add_measure(measure_histogram_n2{&config, hist_n, beta, U}, "density histogram measurement");
-  CTQMC.add_measure(measure_d2{&config, d, beta, U}, "double occupancy measurement");
-  CTQMC.add_measure(measure_histogram_d2{&config, hist_d, beta, U}, "double occupancy histogram measurement");
-  CTQMC.add_measure(measure_M2{&config, m_iw, beta, U}, "M measurement");
-  if (k>0)
-    CTQMC.add_measure(measure_Mk2{&config, mk_iw, k, beta, U}, "M kth order measurement");
+  //CTQMC.add_measure(measure_n2{&config, n, beta, U}, "density measurement");
+  //CTQMC.add_measure(measure_histogram_n2{&config, hist_n, beta, U}, "density histogram measurement");
+  //CTQMC.add_measure(measure_d2{&config, d, beta, U}, "double occupancy measurement");
+  //CTQMC.add_measure(measure_histogram_d2{&config, hist_d, beta, U}, "double occupancy histogram measurement");
+  //CTQMC.add_measure(measure_M2{&config, m_iw, beta, U}, "M measurement");
+  //if (k>0)
+  //  CTQMC.add_measure(measure_Mk2{&config, mk_iw, k, beta, U}, "M kth order measurement");
 
   // Run and collect results
   CTQMC.warmup_and_accumulate(n_warmup_cycles, n_cycles, length_cycle, triqs::utility::clock_callback(max_time));

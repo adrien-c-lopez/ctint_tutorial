@@ -83,10 +83,10 @@ struct g0bar_tau {
   //std::vector<dcomplex> Hist_m() { return hist_m; };
 
   /// Construct a ctint solver
-  solver(double beta_, int n_iw = 1024, int n_tau = 100001);
+  solver(double beta_, int n_iw = 500, int n_tau = 5001);
 
   /// Method that performs the QMC calculation
-  void solve(double U, double delta, double delta0=.5, int k=-1, int n_cycles=10000, int length_cycle = 50, int n_warmup_cycles = 5000, std::string random_name = "",
+  void solve(double U, double delta=0, double delta0=.5, int k=-1, int n_cycles=10000, int length_cycle = 50, int n_warmup_cycles = 5000, std::string random_name = "",
               int max_time = -1, int seed=34788);
 
   };
@@ -135,10 +135,10 @@ struct g0bar_tau {
   //std::vector<dcomplex> Hist_m() { return hist_m; };
 
   /// Construct a ctint solver
-  solver2(double beta_, int n_iw = 1024, int n_tau = 100001);
+  solver2(double beta_, int n_iw = 500, int n_tau = 5001);
 
   /// Method that performs the QMC calculation
-  void solve(double U, double delta, double delta0=.5, int k=-1, int nobc=100, int n_cycles=10000, int length_cycle = 50, int n_warmup_cycles = 5000, std::string random_name = "",
+  void solve(double U, double delta=0, double delta0=.5, int k=-1, int nobc=100, int n_cycles=10000, int length_cycle = 50, int n_warmup_cycles = 5000, std::string random_name = "",
               int max_time = -1, int seed=34788);
   };
   

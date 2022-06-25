@@ -469,12 +469,12 @@ solver::solver(double beta_, int n_iw, int n_tau)
      hist_d{std::vector<dcomplex>(2)}
      //hist_m{std::vector<dcomplex>(2)}
      {
-       std::cout << "--------- /!\\ Using Solver /!\\ ---------\n";
+      std::cout << "--------- CTINT-TUTORIAL ---------\n";
      }
 
 // The method that runs the qmc
 void solver::solve(double U, double delta, double delta0, int k, int n_cycles, int length_cycle, int n_warmup_cycles, std::string random_name, int max_time, int seed) {
-  std::cout << "--------- /!\\ Using Solver /!\\ ---------\n";
+  std::cout << "--------- CTINT-TUTORIAL ---------\n";
 
   mpi::communicator world;
   triqs::clef::placeholder<0> spin_;
@@ -501,13 +501,13 @@ void solver::solve(double U, double delta, double delta0, int k, int n_cycles, i
   CTQMC.add_move(move_remove{&config, CTQMC.get_rng(), beta, U}, "removal");
   CTQMC.add_measure(measure_histogram{&config, hist}, "histogram measurement");
   CTQMC.add_measure(measure_histogram_sign{&config, hist_sign}, "sign histogram measurement");
-  CTQMC.add_measure(measure_n{&config, n}, "n measurement");
-  CTQMC.add_measure(measure_histogram_n{&config, hist_n}, "n histogram measurement");
-  CTQMC.add_measure(measure_d{&config, d}, "double occupancy measurement");
-  CTQMC.add_measure(measure_histogram_d{&config, hist_d}, "double occupancy histogram measurement");
-  CTQMC.add_measure(measure_M{&config, m_iw, beta}, "M measurement");
-  if (k > 0)
-    CTQMC.add_measure(measure_Mk{&config, mk_iw, k, beta}, "M kth order measurement");
+  //CTQMC.add_measure(measure_n{&config, n}, "n measurement");
+  //CTQMC.add_measure(measure_histogram_n{&config, hist_n}, "n histogram measurement");
+  //CTQMC.add_measure(measure_d{&config, d}, "double occupancy measurement");
+  //CTQMC.add_measure(measure_histogram_d{&config, hist_d}, "double occupancy histogram measurement");
+  //CTQMC.add_measure(measure_M{&config, m_iw, beta}, "M measurement");
+  //if (k > 0)
+  //  CTQMC.add_measure(measure_Mk{&config, mk_iw, k, beta}, "M kth order measurement");
 
 
   // Run and collect results
